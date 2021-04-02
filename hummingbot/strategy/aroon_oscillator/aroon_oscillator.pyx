@@ -1283,7 +1283,6 @@ cdef class AroonOscillatorStrategy(StrategyBase):
                 price_quote_str = [f"{sell.size.normalize()} {self.base_asset}, "
                                    f"{sell.price.normalize()} {self.quote_asset}"
                                    for sell in proposal.sells]
-                self.logger().info(f"1proposal sells: {proposal.sells}")
                 self.logger().info(
                     f"({self.trading_pair}) Creating {len(proposal.sells)} ask "
                     f"orders at (Size, Price): {price_quote_str}"
