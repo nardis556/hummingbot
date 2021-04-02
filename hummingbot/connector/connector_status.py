@@ -21,7 +21,7 @@ connector_status = {
     'hitbtc': 'yellow',
     'huobi': 'green',
     'idex': 'green',
-    'kraken': 'yellow',
+    'kraken': 'green',
     'kucoin': 'green',
     'liquid': 'yellow',
     'loopring': 'yellow',
