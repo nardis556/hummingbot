@@ -543,7 +543,8 @@ class IdexExchangeUnitTest(unittest.TestCase):
         not_found_exception = context.exception
         self.assertIsInstance(not_found_exception, OSError)
 
-        # TODO: Address the error returned by get_order:
+        # TODO: Address the error returned by get_order - currently produces OrderNotFound 404 error when
+        #  get_order is called on an order after its cancellation:
         """
         OSError: Error fetching data from https://api-sandbox-eth.idex.io/v1/orders, 
         https://api-sandbox-eth.idex.io/v1/orders?nonce=7e1dd31d-a156-11eb-9d63-f4d108a337c5&
