@@ -381,13 +381,6 @@ class IdexExchange(ExchangeBase):
                 if exchange_order_id == format_cancelled_id:
                     self.logger().info(f"Successfully cancelled order:{client_order_id}. "
                                        f"exchange id:{exchange_order_id}")
-                    self.stop_tracking_order(client_order_id)
-                    self.trigger_event(MarketEvent.OrderCancelled,
-                                       OrderCancelledEvent(
-                                           self.current_timestamp,
-                                           client_order_id,
-                                           tracked_order.exchange_order_id))
-                    tracked_order.cancelled_event.set()
                     return client_order_id
                 else:
                     raise IOError(f"delete_order({client_order_id}) tracked with exchange id: {exchange_order_id} "

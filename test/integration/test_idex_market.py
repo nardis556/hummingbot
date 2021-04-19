@@ -144,6 +144,9 @@ class IdexExchangeUnitTest(unittest.TestCase):
         )
         print("Ready.")
 
+    def run_async(self, task):
+        return self.ev_loop.run_until_complete(task)
+
     @classmethod
     def tearDownClass(cls) -> None:
         cls.stack.close()
@@ -249,6 +252,10 @@ class IdexExchangeUnitTest(unittest.TestCase):
             resp = fixture_ws.copy()
             resp["orderId"] = exchange_order_id
             HummingWsServerFactory.send_json_threadsafe(WS_BASE_URL, resp, delay=0.1)
+
+    async def _get_order(self, exchange_order_id):
+        order_details = await self.market.get_order(exchange_order_id)
+        return order_details
 
     def test_limit_taker_buy(self):
         self.assertGreater(self.market.get_balance("ETH"), Decimal("0.05"))
@@ -513,6 +520,28 @@ class IdexExchangeUnitTest(unittest.TestCase):
 
             recorder.stop()
             os.unlink(self.db_path)
+
+    def test_get_order_after_cancellation(self):
+        trading_pair = "DIL-ETH"
+
+        current_bid_price: Decimal = self.market.get_price(trading_pair, True)
+        amount: Decimal = Decimal("5.0")
+        self.assertGreater(self.market.get_balance("DIL"), amount)
+
+        bid_price: Decimal = current_bid_price - Decimal("0.1") * current_bid_price
+        quantize_bid_price: Decimal = self.market.quantize_order_price(trading_pair, bid_price)
+        quantized_amount: Decimal = self.market.quantize_order_amount(trading_pair, amount)
+        order_id, exchange_order_id = self._place_order(True, trading_pair, quantized_amount, OrderType.LIMIT_MAKER,
+                                                        quantize_bid_price, 10001, FixtureIdex.OPEN_BUY_LIMIT_ORDER,
+                                                        FixtureIdex.WS_ORDER_OPEN)
+        self.assertEqual(order_details["orderId"], order_cancelled_event.exchange_order_id)
+        self._cancel_order(trading_pair, order_id, exchange_order_id, FixtureIdex.WS_ORDER_CANCELLED)
+        [order_cancelled_event] = self.run_parallel(self.market_logger.wait_for(OrderCancelledEvent))
+        order_cancelled_event: OrderCancelledEvent = order_cancelled_event
+        self.assertEqual(order_cancelled_event.order_id, order_id)
+        order_details = self.run_async(self._get_order(order_cancelled_event.exchange_order_id))
+        self.assertEqual(order_details["orderId"], order_cancelled_event.exchange_order_id)
+
 
 
 if __name__ == "__main__":
