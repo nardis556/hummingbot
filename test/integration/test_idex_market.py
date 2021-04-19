@@ -534,7 +534,6 @@ class IdexExchangeUnitTest(unittest.TestCase):
         order_id, exchange_order_id = self._place_order(True, trading_pair, quantized_amount, OrderType.LIMIT_MAKER,
                                                         quantize_bid_price, 10001, FixtureIdex.OPEN_BUY_LIMIT_ORDER,
                                                         FixtureIdex.WS_ORDER_OPEN)
-        self.assertEqual(order_details["orderId"], order_cancelled_event.exchange_order_id)
         self._cancel_order(trading_pair, order_id, exchange_order_id, FixtureIdex.WS_ORDER_CANCELLED)
         [order_cancelled_event] = self.run_parallel(self.market_logger.wait_for(OrderCancelledEvent))
         order_cancelled_event: OrderCancelledEvent = order_cancelled_event
