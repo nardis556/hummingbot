@@ -446,8 +446,9 @@ class IdexExchangeUnitTest(unittest.TestCase):
             self.assertEqual(1, len(self.market.limit_orders))
             self.assertEqual(1, len(self.market.tracking_states))
             self.logger().info("About to start the cancel!")
+            # Sleep asynchronously for 5 seconds to allow the market to complete startup before cancellation.
+            self.run_async(asyncio.sleep(5))
             # Cancel the order and verify that the change is saved.
-
             self._cancel_order(trading_pair, order_id, exchange_order_id, FixtureIdex.WS_ORDER_CANCELLED)
             self.run_parallel(self.market_logger.wait_for(OrderCancelledEvent))
             order_id = None
@@ -546,9 +547,9 @@ class IdexExchangeUnitTest(unittest.TestCase):
         # TODO: Address the error returned by get_order - currently produces OrderNotFound 404 error when
         #  get_order is called on an order after its cancellation:
         """
-        OSError: Error fetching data from https://api-sandbox-eth.idex.io/v1/orders, 
+        OSError: Error fetching data from https://api-sandbox-eth.idex.io/v1/orders,
         https://api-sandbox-eth.idex.io/v1/orders?nonce=7e1dd31d-a156-11eb-9d63-f4d108a337c5&
-        wallet=0x3e4074B1C4D3081AA6Fb44B7503d71CdedDEf51b&orderId=7e356520-a156-11eb-8fd0-2b5567d9806d. 
+        wallet=0x3e4074B1C4D3081AA6Fb44B7503d71CdedDEf51b&orderId=7e356520-a156-11eb-8fd0-2b5567d9806d.
         HTTP status is 404. {'code': 'ORDER_NOT_FOUND', 'message': 'Order not found'}
         """
         # self.assertEqual(order_details["orderId"], order_cancelled_event.exchange_order_id)
