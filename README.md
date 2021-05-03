@@ -14,6 +14,8 @@ At the moment the only supported method to get the Idex connector running is ins
 Install scripts are located in directory `hummingbot/installation/install-from-source`
 Use the appropriate script for your OS.
 
+If using a virtual machine to run Linux, please ensure you allocate enough RAM (AWS t2.small or equalivalent) to ensure the Hummingbot instance can run effectively. 
+The hummingbot installation will fail silently if not enough RAM is allocated. 
 
 ----
 [![Jenkins](https://jenkins-02.coinalpha.com/buildStatus/icon?job=hb_test-master_branch&subject=jenkins:master)](https://jenkins-02.coinalpha.com/job/hb_test-master_branch)
