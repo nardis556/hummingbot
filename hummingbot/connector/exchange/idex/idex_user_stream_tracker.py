@@ -24,7 +24,7 @@ class IdexUserStreamTracker(UserStreamTracker):
     def __init__(self,
                  idex_auth: Optional[IdexAuth] = None,
                  trading_pairs: Optional[List[str]] = [],
-                 domain: str = "eth"):
+                 domain: str = "matic"):
         super(IdexUserStreamTracker, self).__init__()
         self._idex_auth: IdexAuth = idex_auth
         self._trading_pairs: List[str] = trading_pairs
@@ -45,7 +45,7 @@ class IdexUserStreamTracker(UserStreamTracker):
 
     @property
     def exchange_name(self) -> str:
-        if self._domain == "eth":  # prod with ETH blockchain
+        if self._domain == "matic":  # prod with MATIC blockchain
             return "idex"
         else:
             return f"idex_{self._domain}"

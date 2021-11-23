@@ -33,7 +33,7 @@ class IdexAPIUserStreamDataSource(UserStreamTrackerDataSource):
         cls._logger = cls._logger or logging.getLogger(__name__)
         return cls._logger
 
-    def __init__(self, idex_auth: IdexAuth, trading_pairs: Optional[List[str]] = [], domain: str = "eth"):
+    def __init__(self, idex_auth: IdexAuth, trading_pairs: Optional[List[str]] = [], domain: str = "matic"):
         self._idex_auth = idex_auth
         self._trading_pairs = trading_pairs
         self._current_listen_key = None
@@ -64,7 +64,8 @@ class IdexAPIUserStreamDataSource(UserStreamTrackerDataSource):
         :option: 15m
         :subcription: ticker
         :market: ETH-USDC
-                Example subscribe JSON:
+
+        Example subscribe response:
         {
             "method": "subscribe",
             "markets": ["ETH-USDC", "IDEX-ETH"],

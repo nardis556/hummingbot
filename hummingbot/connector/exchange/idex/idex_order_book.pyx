@@ -131,9 +131,10 @@ cdef class IdexOrderBook(OrderBook):
         # msg keys taken from ws trade response
         if metadata:
             msg.update(metadata)
+        # add fields to IdexOrderBookMessage.content that will be used in OrderBookTracker._emit_trade_event_loop()
         msg.update({
             "exchange_order_id": msg.get("data").get("i"),
-            "trade_type": msg.get("data").get("s"),
+            "trade_type": 1 if msg.get("data").get("s") == 'buy' else 2,  # values from enum TradeType
             "price": msg.get("data").get("p"),
             "amount": msg.get("data").get("q"),
         })

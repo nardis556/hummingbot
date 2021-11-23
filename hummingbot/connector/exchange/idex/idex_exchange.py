@@ -29,7 +29,7 @@ from hummingbot.connector.exchange.idex.idex_order_book_tracker import IdexOrder
 from hummingbot.connector.exchange.idex.idex_user_stream_tracker import IdexUserStreamTracker
 from hummingbot.connector.exchange.idex.idex_utils import (
     hb_order_type_to_idex_param, hb_trade_type_to_idex_param, EXCHANGE_NAME, get_new_client_order_id, DEBUG,
-    ETH_GAS_LIMIT, BSC_GAS_LIMIT, HUMMINGBOT_GAS_LOOKUP,
+    get_gas_limit,
 )
 from hummingbot.connector.exchange.idex.idex_resolve import (
     get_idex_rest_url, get_idex_blockchain, set_domain, get_throttler
@@ -64,7 +64,7 @@ class IdexExchange(ExchangeBase):
                  idex_wallet_private_key: str,
                  trading_pairs: Optional[List[str]] = None,
                  trading_required: bool = True,
-                 domain="eth"):
+                 domain="matic"):
         """
         :param idex_com_api_key: The API key to connect to private idex.io APIs.
         :param idex_com_secret_key: The API secret.
@@ -85,7 +85,7 @@ class IdexExchange(ExchangeBase):
         self._shared_client: Optional[aiohttp.ClientSession] = None
         self._poll_notifier = asyncio.Event()
         self._last_timestamp = 0
-        self._in_flight_orders = {}  # Dict[client_order_id:str, idexComInFlightOrder]
+        self._in_flight_orders: Dict[str, IdexInFlightOrder] = {}  # Dict[client_order_id:str, idexComInFlightOrder]
         self._order_not_found_records = {}  # Dict[client_order_id:str, count:int]
         self._trading_rules = {}  # Dict[trading_pair:str, TradingRule]
         self._status_polling_task = None
@@ -95,7 +95,7 @@ class IdexExchange(ExchangeBase):
         self._exchange_info = None  # stores info about the exchange. Periodically polled from GET /v1/exchange
         self._market_info = None    # stores info about the markets. Periodically polled from GET /v1/markets
         # self._throttler_public_endpoint = Throttler(rate_limit=(2, 1.0))  # rate_limit=(weight, t_period)
-        # self._throttler_user_endpoint = Throttler(rate_limit=(3, 1.0))  # rate_limit=(weight, t_period)
+        # self._throttler_user_endpoint = Throttler(rate_limit=(3, 1.0))  # rate_limit=(weight, t_period)  # todo alf: remove this
         # self._throttler_trades_endpoint = Throttler(rate_limit=(4, 1.0))  # rate_limit=(weight, t_period)
         self._order_lock = asyncio.Lock()  # exclusive access for modifying orders
 
@@ -107,7 +107,7 @@ class IdexExchange(ExchangeBase):
     @property
     def name(self) -> str:
         """Returns the exchange name"""
-        if self._domain == "eth":  # prod with ETH blockchain
+        if self._domain == "matic":  # prod with MATIC blockchain
             return "idex"
         else:
             return f"idex_{self._domain}"
@@ -278,27 +278,44 @@ class IdexExchange(ExchangeBase):
         Exchange Response Example:
         {
             "timeZone": "UTC",
-            "serverTime": 1590408000000,
-            "ethereumDepositContractAddress": "0x...",
-            "ethUsdPrice": "206.46",
-            "gasPrice": 7,
-            "volume24hUsd": "10416227.98",
-            "makerFeeRate": "0.001",
-            "takerFeeRate": "0.002",
-            "makerTradeMinimum": "0.15000000",
-            "takerTradeMinimum": "0.05000000",
-            "withdrawalMinimum": "0.04000000"
+            "serverTime": 1637440989597,
+            "maticDepositContractAddress": "0x...",
+            "maticCustodyContractAddress": "0x...",
+            "maticUsdPrice": "1.64",
+            "gasPrice": 4,
+            "volume24hUsd": "1431.07",
+            "totalVolumeUsd": "79631.43",
+            "totalTrades": 76474,
+            "totalValueLockedUsd": "24.58",
+            "idexTokenAddress": "0x...",
+            "idexUsdPrice": "0.39",
+            "idexMarketCapUsd": "221192826.00",
+            "makerFeeRate": "0.0010",
+            "takerFeeRate": "0.0025",
+            "takerIdexFeeRate": "0.0005",
+            "takerLiquidityProviderFeeRate": "0.0020",
+            "makerTradeMinimum": "1.00000000",
+            "takerTradeMinimum": "0.10000000",
+            "withdrawMinimum": "0.05000000",
+            "liquidityAdditionMinimum": "0.05000000",
+            "liquidityRemovalMinimum": "0.04000000",
+            "blockConfirmationDelay": 15
         }
 
         Market Response Example:
         [
             {
-                "market": "ETH-USDC",
-                "status": "active",
-                "baseAsset": "ETH",
+                "market": "MATIC-USD",
+                "type": "hybrid",
+                "status": "activeHybrid",
+                "baseAsset": "MATIC",
                 "baseAssetPrecision": 8,
-                "quoteAsset": "USDC",
-                "quoteAssetPrecision": 8
+                "quoteAsset": "USD",
+                "quoteAssetPrecision": 8,
+                "makerFeeRate": "0.0010",
+                "takerFeeRate": "0.0025",
+                "takerIdexFeeRate": "0.0005",
+                "takerLiquidityProviderFeeRate": "0.0020"
             },
             ...
         ]
@@ -749,24 +766,23 @@ class IdexExchange(ExchangeBase):
                 order_side: TradeType,
                 amount: Decimal,
                 price: Decimal = s_decimal_NaN) -> TradeFee:
-        # Assumption made here that some limit orders may end up incurring gas fees as takers if they cross the spread.
-        # This makes the fee estimate relatively conservative
+        """
+        Return an estimation for fees before orders are submitted. Called by hummingbot strategies before
+        submitting orders to estimate profitability of trade proposals and constrain operations to budget.
+        We assume that some limit orders may end up incurring gas fees as takers if they cross the spread,
+        so the fee estimate here is relatively conservative.
+        For actual fees incurred by running orders see: IdexInFlightOrder.update_with_fill_update
+        """
         is_maker = order_type is OrderType.LIMIT_MAKER
         percent_fees: Decimal = estimate_fee(EXCHANGE_NAME, is_maker).percent
         if is_maker:
             return TradeFee(percent=percent_fees)
-        # for taker idex v1 collects additional gas fee, collected in the asset received by the taker
+        # for taker idex v3 collects additional gas fee, collected in the asset received by the taker
         flat_fees = []
-        blockchain = get_idex_blockchain()  # either ETH or BSC
-        gas_limit = ETH_GAS_LIMIT if blockchain == 'ETH' else BSC_GAS_LIMIT
-        if HUMMINGBOT_GAS_LOOKUP:
-            # resolve gas price from hummingbot's eth_gas_station_lookup
-            # conf to be ON for hummingbot to resolve gas price: global_config_map["ethgasstation_gas_enabled"]
-            raise ValueError('Setting HUMMINGBOT_GAS_LOOKUP = True is not currently supported')
-            # gas_amount: Decimal = eth_gas_station_lookup.get_gas_price(in_gwei=False) * Decimal(gas_limit)
-            # flat_fees = [(blockchain, gas_amount)]
-        elif self._exchange_info and 'gasPrice' in self._exchange_info:
-            # or resolve gas price from idex exchange endpoint
+        blockchain = get_idex_blockchain()
+        gas_limit = get_gas_limit(blockchain)
+        if self._exchange_info and 'gasPrice' in self._exchange_info:
+            # resolve gas price from idex exchange endpoint
             gas_price: Decimal = Decimal(self._exchange_info['gasPrice']) / Decimal("1e9")
             gas_amount: Decimal = gas_price * Decimal(gas_limit)
             flat_fees = [(blockchain, gas_amount)]

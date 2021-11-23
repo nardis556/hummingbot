@@ -16,15 +16,15 @@ from eth_account.signers.local import LocalAccount
 from eth_typing import HexStr
 from web3 import Web3
 
-from hummingbot.connector.exchange.idex.idex_resolve import get_idex_rest_url, get_idex_blockchain
+from hummingbot.connector.exchange.idex.idex_resolve import get_idex_rest_url, get_idex_blockchain, is_idex_sandbox
 from hummingbot.logger import HummingbotLogger
 
 ia_logger = None
 
 
 class HashVersionEnum(Enum):  # Blockchain
-    ETH = 1
-    BSC = 2
+    MATIC_PROD = 3
+    MATIC_SANDBOX = 103
 
 
 class OrderTypeEnum(Enum):
@@ -147,7 +147,7 @@ class IdexAuth:
         private_key = private_key or self._wallet_private_key
         return Account.from_key(private_key)
 
-    def get_wallet_bytes(self, private_key: str = None) -> str:
+    def get_wallet_bytes(self, private_key: str = None) -> str:  # todo: remove !!!
         raise PendingDeprecationWarning
         # private_key = private_key or self.wallet_private_key
         # return IdexAuth.remove0x_prefix(Account.from_key(private_key).address)
@@ -279,10 +279,10 @@ class IdexAuth:
                Default: OrderSelfTradePreventionEnum.dc
         :return: tuple of signature parameters
         """
-
-        hash_version = HashVersionEnum[get_idex_blockchain()]
+        blockchain, platform = get_idex_blockchain(), ('SANDBOX' if is_idex_sandbox() else 'PROD')
+        hash_version = HashVersionEnum[f'{blockchain}_{platform}']
         signature_parameters = (
-            ('uint8', hash_version.value),  # 0 - The signature hash version is 1 for Ethereum, 2 for BSC
+            ('uint8', hash_version.value),  # 0 - The signature hash version is 3 for mainnet, 103 for sandbox
             ('uint128', self.get_nonce_int()),  # 1 - Nonce
             ('address', self.get_wallet_address()),  # 2 - Signing wallet address
             ('string', market),  # 3 - Market symbol (e.g. ETH-USDC)

@@ -32,7 +32,7 @@ from hummingbot.connector.exchange.idex.idex_active_order_tracker import IdexAct
 from hummingbot.connector.exchange.idex.idex_order_book_tracker_entry import IdexOrderBookTrackerEntry
 from hummingbot.connector.exchange.idex.idex_order_book import IdexOrderBook
 from hummingbot.connector.exchange.idex.idex_resolve import get_idex_rest_url, get_idex_ws_feed, get_throttler
-from hummingbot.connector.exchange.idex.idex_utils import DEBUG
+from hummingbot.connector.exchange.idex.idex_utils import DEBUG, DISABLE_LISTEN_FOR_ORDERBOOK_DIFFS
 
 MAX_RETRIES = 20
 NaN = float("nan")
@@ -66,7 +66,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
         return {t_pair: result for t_pair, result in zip(trading_pairs, results)}
 
     @classmethod
-    async def get_last_traded_price(cls, trading_pair: str, base_url: str = "https://api-eth.idex.io") -> float:
+    async def get_last_traded_price(cls, trading_pair: str, base_url: str = "https://api-matic.idex.io") -> float:
         async with get_throttler().weighted_task(request_weight=1):
             async with aiohttp.ClientSession() as client:
                 url = f"{base_url}/v1/trades/?market={trading_pair}"
@@ -102,7 +102,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
         async with get_throttler().weighted_task(request_weight=1):
             try:
                 async with aiohttp.ClientSession() as client:
-                    # ensure IDEX_REST_URL has appropriate blockchain imported (ETH or BSC)
+                    # ensure IDEX_REST_URL has appropriate blockchain imported (MATIC)
                     base_url: str = get_idex_rest_url(domain=domain)
                     async with client.get(f"{base_url}/v1/tickers", timeout=5) as response:
                         if response.status == 200:
@@ -231,19 +231,20 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
         Subscribe to trade channel via Idex WebSocket and keep the connection open for incoming messages.
 
         WebSocket trade subscription response example:
-            {
+        {
             "type": "trades",
             "data": {
-                    "m": "ETH-USDC",
-                    "i": "a0b6a470-a6bf-11ea-90a3-8de307b3b6da",
-                    "p": "202.74900000",
-                    "q": "10.00000000",
-                    "Q": "2027.49000000",
-                    "t": 1590394500000,
-                    "s": "sell",
-                    "u": 848778
-                    }
+                "m": "ETH-USDC",
+                "i": "a0b6a470-a6bf-11ea-90a3-8de307b3b6da",
+                "p": "202.74900000",
+                "q": "10.00000000",
+                "Q": "2027.49000000",
+                "t": 1590394500000,
+                "s": "sell",
+                "y": "hybrid",
+                "u": 848778
             }
+        }
 
         :param ev_loop: ev_loop to execute this function in
         :param output: an async queue where the incoming messages are stored
@@ -314,10 +315,11 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
         """
 
         while True:
-            idex_ws_feed = get_idex_ws_feed()
-            if DEBUG:
-                self.logger().info(f"IOB.listen_for_order_book_diffs new connection to ws: {idex_ws_feed}")
             try:
+                if DISABLE_LISTEN_FOR_ORDERBOOK_DIFFS:
+                    await asyncio.sleep(3600)
+                    continue
+                idex_ws_feed = get_idex_ws_feed()
                 trading_pairs: List[str] = self._trading_pairs
                 async with websockets.connect(idex_ws_feed) as ws:
                     ws: websockets.WebSocketClientProtocol = ws
@@ -366,7 +368,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
                         try:
                             snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair)
                             if DEBUG:
-                                self.logger().info(f'<<<<< aiohttp snapshot response: {snapshot}')
+                                self.logger().info(f'<<<<< aiohttp orderbook snapshot response: {snapshot}')
                             snapshot_timestamp: float = time.time()
                             snapshot_msg: OrderBookMessage = IdexOrderBook.snapshot_message_from_exchange(
                                 snapshot,
@@ -376,8 +378,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
                             output.put_nowait(snapshot_msg)
                             if DEBUG:
                                 self.logger().info(f"Saved orderbook snapshot for {trading_pair}")
-                            # Be careful not to go above API rate limits
-                            await asyncio.sleep(0.2)
+                            await asyncio.sleep(0)
                         except asyncio.CancelledError:
                             raise
                         except Exception:
@@ -386,7 +387,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
                     this_hour: pd.Timestamp = pd.Timestamp.utcnow().replace(minute=0, second=0, microsecond=0)
                     next_hour: pd.Timestamp = this_hour + pd.Timedelta(hours=1)
                     delta: float = next_hour.timestamp() - time.time()
-                    await asyncio.sleep(delta)
+                    await asyncio.sleep(delta)  # todo alf: how frequent is this ? 1 x hour ? we must increase !!!!!
             except asyncio.CancelledError:
                 raise
             except Exception:

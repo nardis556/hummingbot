@@ -1,87 +1,63 @@
 #!/usr/bin/env python
 
-# API Feed adjusted to sandbox url
-from hummingbot.core.event.events import TradeType, OrderType
 from hummingbot.core.utils.asyncio_throttle import Throttler
 
-IDEX_REST_URL_FMT = "https://api-sandbox-{blockchain}.idex.io/"
-# WS Feed adjusted to sandbox url
-IDEX_WS_FEED_FMT = "wss://websocket-sandbox-{blockchain}.idex.io/v1"
+
+# IDEX v3 REST API url for production and sandbox (users may need to modify this someday)
+_IDEX_REST_URL_PROD_MATIC = "https://api-matic.idex.io"
+_IDEX_REST_URL_SANDBOX_MATIC = "https://api-sandbox-matic.idex.io"
+
+# IDEX v3 WebSocket urls for production and sandbox (users may need to modify this someday)
+_IDEX_WS_FEED_PROD_MATIC = "wss://websocket-matic.idex.io/v1"
+_IDEX_WS_FEED_SANDBOX_MATIC = "wss://websocket-sandbox-matic.idex.io/v1"
 
 
-_IDEX_REST_URL_SANDBOX_ETH = "https://api-sandbox-eth.idex.io"
-_IDEX_REST_URL_SANDBOX_BSC = "https://api-sandbox-bsc.idex.io"
-_IDEX_REST_URL_PROD_ETH = "https://api-eth.idex.io"
-_IDEX_REST_URL_PROD_BSC = "https://api-bsc.idex.io"
-
-_IDEX_WS_FEED_SANDBOX_ETH = "wss://websocket-sandbox-eth.idex.io/v1"
-_IDEX_WS_FEED_SANDBOX_BSC = "wss://websocket-sandbox-bsc.idex.io/v1"
-_IDEX_WS_FEED_PROD_ETH = "wss://websocket-eth.idex.io/v1"
-_IDEX_WS_FEED_PROD_BSC = "wss://websocket-bsc.idex.io/v1"
-
+# --- users should not modify anything beyond this point ---
 
 _IDEX_BLOCKCHAIN = None
 _IS_IDEX_SANDBOX = None
 
 
-def set_domain(domain):
+def set_domain(domain: str):
     """Save user selected domain so we don't have to pass around domain to every method"""
     global _IDEX_BLOCKCHAIN, _IS_IDEX_SANDBOX
 
-    if domain == "eth":  # prod eth
-        _IDEX_BLOCKCHAIN = 'ETH'
+    if domain == "matic":  # prod matic
+        _IDEX_BLOCKCHAIN = 'MATIC'
         _IS_IDEX_SANDBOX = False
-    elif domain == "bsc":  # prod bsc
-        _IDEX_BLOCKCHAIN = 'BSC'
-        _IS_IDEX_SANDBOX = False
-    elif domain == "sandbox_eth":
-        _IDEX_BLOCKCHAIN = 'ETH'
-        _IS_IDEX_SANDBOX = True
-    elif domain == "sandbox_bsc":
-        _IDEX_BLOCKCHAIN = 'BSC'
+    elif domain == "sandbox_matic":
+        _IDEX_BLOCKCHAIN = 'MATIC'
         _IS_IDEX_SANDBOX = True
     else:
         raise Exception(f'Bad configuration of domain "{domain}"')
 
 
-def get_rest_url_for_domain(domain):
-    if domain == "eth":  # prod eth
-        return _IDEX_REST_URL_PROD_ETH
-    elif domain == "bsc":  # prod bsc
-        return _IDEX_REST_URL_PROD_BSC
-    elif domain == "sandbox_eth":
-        return _IDEX_REST_URL_SANDBOX_ETH
-    elif domain == "sandbox_bsc":
-        return _IDEX_REST_URL_SANDBOX_BSC
+def get_rest_url_for_domain(domain: str) -> str:
+    if domain == "matic":  # production uses polygon mainnet (matic)
+        return _IDEX_REST_URL_PROD_MATIC
+    elif domain == "sandbox_matic":
+        return _IDEX_REST_URL_SANDBOX_MATIC
     else:
         raise Exception(f'Bad configuration of domain "{domain}"')
 
 
-def get_ws_url_for_domain(domain):
-    if domain == "eth":  # prod eth
-        return _IDEX_WS_FEED_PROD_ETH
-    elif domain == "bsc":  # prod bsc
-        return _IDEX_WS_FEED_PROD_BSC
-    elif domain == "sandbox_eth":
-        return _IDEX_WS_FEED_SANDBOX_ETH
-    elif domain == "sandbox_bsc":
-        return _IDEX_WS_FEED_SANDBOX_BSC
+def get_ws_url_for_domain(domain: str) -> str:
+    if domain == "matic":  # production uses polygon mainnet (matic)
+        return _IDEX_WS_FEED_PROD_MATIC
+    elif domain == "sandbox_matic":
+        return _IDEX_WS_FEED_SANDBOX_MATIC
     else:
         raise Exception(f'Bad configuration of domain "{domain}"')
 
 
-def get_idex_blockchain():
+def get_idex_blockchain() -> str:
     """Late loading of user selected blockchain from configuration"""
-    if _IDEX_BLOCKCHAIN is None:
-        return 'ETH'
-    return _IDEX_BLOCKCHAIN
+    return _IDEX_BLOCKCHAIN or 'MATIC'
 
 
-def is_idex_sandbox():
+def is_idex_sandbox() -> bool:
     """Late loading of user selection of using sandbox from configuration"""
-    if _IS_IDEX_SANDBOX is None:
-        return False
-    return _IS_IDEX_SANDBOX
+    return bool(_IS_IDEX_SANDBOX)
 
 
 def get_idex_rest_url(domain=None):
@@ -89,10 +65,9 @@ def get_idex_rest_url(domain=None):
     if domain is not None:
         # we need to pass the domain only if the method is called before the market is instantiated
         return get_rest_url_for_domain(domain)
-    if is_idex_sandbox():
-        return _IDEX_REST_URL_SANDBOX_ETH if get_idex_blockchain() == 'ETH' else _IDEX_REST_URL_SANDBOX_BSC
-    else:
-        return _IDEX_REST_URL_PROD_ETH if get_idex_blockchain() == 'ETH' else _IDEX_REST_URL_PROD_BSC
+    blockchain = get_idex_blockchain()
+    platform = 'SANDBOX' if is_idex_sandbox() else 'PROD'
+    return globals()[f'_IDEX_REST_URL_{platform}_{blockchain}']
 
 
 def get_idex_ws_feed(domain=None):
@@ -100,48 +75,15 @@ def get_idex_ws_feed(domain=None):
     if domain is not None:
         # we need to pass the domain only if the method is called before the market is instantiated
         return get_ws_url_for_domain(domain)
-    if is_idex_sandbox():
-        return _IDEX_WS_FEED_SANDBOX_ETH if get_idex_blockchain() == 'ETH' else _IDEX_WS_FEED_SANDBOX_BSC
-    else:
-        return _IDEX_WS_FEED_PROD_ETH if get_idex_blockchain() == 'ETH' else _IDEX_WS_FEED_PROD_BSC
-
-
-HB_ORDER_TYPE_MAP = {
-    OrderType.MARKET: "market",
-    OrderType.LIMIT: "limit",
-    OrderType.LIMIT_MAKER: "limitMaker",
-}
-
-
-def to_idex_order_type(order_type: OrderType):
-    return HB_ORDER_TYPE_MAP[order_type]
-
-
-IDEX_ORDER_TYPE_MAP = {
-    "market": OrderType.MARKET,
-    "limit": OrderType.LIMIT,
-    "limitMaker": OrderType.LIMIT_MAKER,
-}
-
-
-def from_idex_order_type(order_type: str):
-    return IDEX_ORDER_TYPE_MAP[order_type]
-
-
-IDEX_TRADE_TYPE_MAP = {
-    "buy": TradeType.BUY,
-    "sell": TradeType.SELL,
-}
-
-
-def from_idex_trade_type(side: str):
-    return IDEX_TRADE_TYPE_MAP[side]
+    blockchain = get_idex_blockchain()
+    platform = 'SANDBOX' if is_idex_sandbox() else 'PROD'
+    return globals()[f'_IDEX_WS_FEED_{platform}_{blockchain}']
 
 
 _throttler = None
 
 
-def get_throttler() -> Throttler:
+def get_throttler() -> Throttler:  # todo alf: check limits for v3
     global _throttler
     if _throttler is None:
         _throttler = Throttler(rate_limit=(4, 1.0))  # rate_limit=(weight, t_period)

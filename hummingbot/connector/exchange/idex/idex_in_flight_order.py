@@ -80,7 +80,7 @@ class IdexInFlightOrder(InFlightOrderBase):
         Updates the in flight order with fill update (from private/get-order-detail end point)
         return: True if the order gets updated otherwise False
         """
-        fill_id = fill_update["i"] if "i" in fill_update else fill_update.get("i")
+        fill_id = fill_update["i"] if "i" in fill_update else fill_update.get("fillId")
         if fill_id in self.fill_id_set:
             # fill already recorded
             return False
