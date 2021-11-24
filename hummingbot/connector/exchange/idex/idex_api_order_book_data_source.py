@@ -53,7 +53,8 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
             cls._iaobds_logger = logging.getLogger(__name__)
         return cls._iaobds_logger
 
-    def __init__(self, trading_pairs: List[str]):
+    def __init__(self, trading_pairs: List[str], domain: Optional[str] = None):
+        self._domain = domain
         super().__init__(trading_pairs)
 
     # Found last trading price in Idex API. Utilized safe_gather to complete all tasks and append last trade prices
@@ -98,7 +99,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
             return result
 
     @staticmethod
-    async def fetch_trading_pairs(domain=None) -> List[str]:
+    async def fetch_trading_pairs(domain: Optional[str] = None) -> List[str]:
         async with get_throttler().weighted_task(request_weight=1):
             try:
                 async with aiohttp.ClientSession() as client:
@@ -120,14 +121,14 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
             return []
 
     @staticmethod
-    async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str) -> Dict[str, Any]:
+    async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str, domain: Optional[str]) -> Dict[str, Any]:
         """
         Fetches order book snapshot for a particular trading pair from the rest API
         :returns: Response from the rest API
         """
         async with get_throttler().weighted_task(request_weight=1):
             # idex level 2 order book is sufficient to provide required data
-            base_url: str = get_idex_rest_url()
+            base_url: str = get_idex_rest_url(domain=domain)
             product_order_book_url: str = f"{base_url}/v1/orderbook?market={trading_pair}&level=2"
             async with client.get(product_order_book_url) as response:
                 response: aiohttp.ClientResponse = response
@@ -139,7 +140,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     async def get_new_order_book(self, trading_pair: str) -> OrderBook:
         async with aiohttp.ClientSession() as client:
-            snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair)
+            snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair, self._domain)
             snapshot_timestamp: float = time.time()
             snapshot_msg: OrderBookMessage = IdexOrderBook.snapshot_message_from_exchange(
                 snapshot,
@@ -167,7 +168,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
             number_of_pairs: int = len(trading_pairs)
             for index, trading_pair in enumerate(trading_pairs):
                 try:
-                    snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair)
+                    snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair, self._domain)
                     snapshot_timestamp: float = time.time()
                     snapshot_msg: OrderBookMessage = IdexOrderBook.snapshot_message_from_exchange(
                         snapshot,
@@ -251,7 +252,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
         """
 
         while True:
-            idex_ws_feed = get_idex_ws_feed()
+            idex_ws_feed = get_idex_ws_feed(domain=self._domain)
             if DEBUG:
                 self.logger().info(f"IOB.listen_for_trades new connection to ws: {idex_ws_feed}")
             try:
@@ -319,7 +320,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 if DISABLE_LISTEN_FOR_ORDERBOOK_DIFFS:
                     await asyncio.sleep(3600)
                     continue
-                idex_ws_feed = get_idex_ws_feed()
+                idex_ws_feed = get_idex_ws_feed(domain=self._domain)
                 trading_pairs: List[str] = self._trading_pairs
                 async with websockets.connect(idex_ws_feed) as ws:
                     ws: websockets.WebSocketClientProtocol = ws
@@ -366,7 +367,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 async with aiohttp.ClientSession() as client:
                     for trading_pair in self._trading_pairs:
                         try:
-                            snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair)
+                            snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair, self._domain)
                             if DEBUG:
                                 self.logger().info(f'<<<<< aiohttp orderbook snapshot response: {snapshot}')
                             snapshot_timestamp: float = time.time()
@@ -384,9 +385,10 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
                         except Exception:
                             self.logger().error("Unexpected error.", exc_info=True)
                             await asyncio.sleep(5.0)
-                    this_hour: pd.Timestamp = pd.Timestamp.utcnow().replace(minute=0, second=0, microsecond=0)
-                    next_hour: pd.Timestamp = this_hour + pd.Timedelta(hours=1)
-                    delta: float = next_hour.timestamp() - time.time()
+                    # this_hour: pd.Timestamp = pd.Timestamp.utcnow().replace(minute=0, second=0, microsecond=0)
+                    # next_hour: pd.Timestamp = this_hour + pd.Timedelta(hours=1)
+                    # delta: float = next_hour.timestamp() - time.time()
+                    delta: float = 60 * 3  # todo alf: make this more decent. get value from idex_utils ?
                     await asyncio.sleep(delta)  # todo alf: how frequent is this ? 1 x hour ? we must increase !!!!!
             except asyncio.CancelledError:
                 raise

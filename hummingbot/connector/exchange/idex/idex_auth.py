@@ -6,7 +6,7 @@ import uuid
 import hashlib
 from enum import Enum
 
-from typing import Dict, Union, Tuple, Any
+from typing import Dict, Union, Tuple, Any, Optional
 from urllib.parse import urlencode, urljoin
 
 import aiohttp
@@ -67,7 +67,7 @@ class IdexAuth:
             ia_logger = logging.getLogger(__name__)
         return ia_logger
 
-    def __init__(self, api_key: str, secret_key: str, wallet_private_key: str = None):
+    def __init__(self, api_key: str, secret_key: str, wallet_private_key: str = None, domain: Optional[str] = None):
         self._api_key = api_key or ''
         self._secret_key = secret_key or ''
         self._wallet_private_key = wallet_private_key or ''
@@ -76,6 +76,7 @@ class IdexAuth:
         self._wallet: Union[LocalAccount, None] = None
 
         self.init_wallet(wallet_private_key)
+        self._domain = domain
 
     @staticmethod
     def encode(s: str) -> bytes:
@@ -227,13 +228,13 @@ class IdexAuth:
                 body = await resp.json()
                 return resp.status, body
 
-    async def fetch_ws_token(self):
+    async def fetch_ws_token(self, domain: Optional[str] = None):
         """
         Returns a single-use authentication token for access to private subscriptions in the WebSocket API.
         HTTP Request: GET /v1/wsToken. Endpoint Security: User Data (HMAC header)
         Returned token is valid for 15 minutes.
         """
-        base_url = get_idex_rest_url()
+        base_url = get_idex_rest_url(domain=domain or self._domain)
         path = '/v1/wsToken'
         url = urljoin(base_url, path)
 
@@ -279,7 +280,8 @@ class IdexAuth:
                Default: OrderSelfTradePreventionEnum.dc
         :return: tuple of signature parameters
         """
-        blockchain, platform = get_idex_blockchain(), ('SANDBOX' if is_idex_sandbox() else 'PROD')
+        blockchain = get_idex_blockchain(domain=self._domain)
+        platform = 'SANDBOX' if is_idex_sandbox(domain=self._domain) else 'PROD'
         hash_version = HashVersionEnum[f'{blockchain}_{platform}']
         signature_parameters = (
             ('uint8', hash_version.value),  # 0 - The signature hash version is 3 for mainnet, 103 for sandbox

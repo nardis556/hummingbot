@@ -72,11 +72,13 @@ class IdexExchange(ExchangeBase):
         :param trading_required: Whether actual trading is needed.
         """
         self._domain = domain
+        # todo alf: remove
+        self.logger().info(f"IdexExchange.__init__ called with domain {domain}")
         set_domain(domain)
         super().__init__()
         self._trading_required = trading_required
         self._trading_pairs = trading_pairs
-        self._idex_auth: IdexAuth = IdexAuth(idex_api_key, idex_api_secret_key, idex_wallet_private_key)
+        self._idex_auth: IdexAuth = IdexAuth(idex_api_key, idex_api_secret_key, idex_wallet_private_key, domain=domain)
         self._account_available_balances = {}  # Dict[asset_name:str, Decimal]
         self._order_book_tracker = IdexOrderBookTracker(trading_pairs=trading_pairs, domain=domain)
         self._user_stream_tracker = IdexUserStreamTracker(self._idex_auth, trading_pairs, domain=domain)
@@ -94,10 +96,12 @@ class IdexExchange(ExchangeBase):
         self._last_poll_timestamp = 0
         self._exchange_info = None  # stores info about the exchange. Periodically polled from GET /v1/exchange
         self._market_info = None    # stores info about the markets. Periodically polled from GET /v1/markets
-        # self._throttler_public_endpoint = Throttler(rate_limit=(2, 1.0))  # rate_limit=(weight, t_period)
-        # self._throttler_user_endpoint = Throttler(rate_limit=(3, 1.0))  # rate_limit=(weight, t_period)  # todo alf: remove this
-        # self._throttler_trades_endpoint = Throttler(rate_limit=(4, 1.0))  # rate_limit=(weight, t_period)
         self._order_lock = asyncio.Lock()  # exclusive access for modifying orders
+        # todo alf: remove
+        self.logger().info(
+            f"Finalizing IdexExchange.__init__ called with domain {domain}>>>> get_idex_blockchain: {get_idex_blockchain()}, "
+            f"get_idex_rest_url(None): {get_idex_rest_url()}, get_idex_rest_url({domain}): {get_idex_rest_url(domain)},"
+        )
 
     @property
     def trading_rules(self) -> Dict[str, TradingRule]:
@@ -442,7 +446,7 @@ class IdexExchange(ExchangeBase):
     async def get_ping(self):
         """Requests status of current connection."""
         async with get_throttler().weighted_task(request_weight=1):
-            rest_url = get_idex_rest_url()
+            rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/ping/"
             session: aiohttp.ClientSession = await self._http_client()
             async with session.get(url) as response:
@@ -453,7 +457,7 @@ class IdexExchange(ExchangeBase):
     async def list_orders(self) -> List[Dict[str, Any]]:
         """Requests status of all active orders. Returns json data of all orders associated with wallet address"""
         async with get_throttler().weighted_task(request_weight=1):
-            rest_url = get_idex_rest_url()
+            rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/orders"
             params = {
                 "nonce": self._idex_auth.generate_nonce(),
@@ -470,7 +474,7 @@ class IdexExchange(ExchangeBase):
     async def get_order(self, exchange_order_id: str) -> Dict[str, Any]:
         """Requests order information through API with exchange order Id. Returns json data with order details"""
         async with get_throttler().weighted_task(request_weight=1):
-            rest_url = get_idex_rest_url()
+            rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/orders"
             params = {
                 "nonce": self._idex_auth.generate_nonce(),
@@ -490,7 +494,7 @@ class IdexExchange(ExchangeBase):
     async def post_order(self, params) -> Dict[str, Any]:
         """Posts an order request to the Idex API. Returns json data with order details"""
         async with get_throttler().weighted_task(request_weight=1):
-            rest_url = get_idex_rest_url()
+            rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/orders"
 
             params.update({
@@ -543,7 +547,7 @@ class IdexExchange(ExchangeBase):
         Returns json data with order id confirming deletion
         """
         async with get_throttler().weighted_task(request_weight=1):
-            rest_url = get_idex_rest_url()
+            rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/orders"
 
             params = {
@@ -576,7 +580,7 @@ class IdexExchange(ExchangeBase):
     async def get_balances_from_api(self) -> List[Dict[str, Any]]:
         """Requests current balances of all assets through API. Returns json data with balance details"""
         async with get_throttler().weighted_task(request_weight=1):
-            rest_url = get_idex_rest_url()
+            rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/balances"
             params = {
                 "nonce": self._idex_auth.generate_nonce(),
@@ -593,7 +597,7 @@ class IdexExchange(ExchangeBase):
     async def get_exchange_info_from_api(self) -> Dict[str, Any]:
         """Requests basic info about idex exchange. We are mostly interested in the gas price in gwei"""
         async with get_throttler().weighted_task(request_weight=1):
-            rest_url = get_idex_rest_url()
+            rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/exchange"
             session: aiohttp.ClientSession = await self._http_client()
             async with session.get(url) as response:
@@ -604,7 +608,7 @@ class IdexExchange(ExchangeBase):
     async def get_market_info_from_api(self) -> List[Dict]:
         """Requests all markets (trading pairs) available to Idex users."""
         async with get_throttler().weighted_task(request_weight=1):
-            rest_url = get_idex_rest_url()
+            rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/markets"
             session: aiohttp.ClientSession = await self._http_client()
             async with session.get(url) as response:
@@ -640,7 +644,7 @@ class IdexExchange(ExchangeBase):
                 amount = self.quantize_order_amount(trading_pair, amount)
                 price = self.quantize_order_price(trading_pair, price)
 
-                if amount < trading_rule.min_order_size:
+                if amount < trading_rule.min_order_size:  # todo alf: this may not be true. Research
                     raise ValueError(f"Buy order amount {amount} is lower than the minimum order size "
                                      f"{trading_rule.min_order_size}. client_order_id: {client_order_id}")
 
@@ -779,7 +783,7 @@ class IdexExchange(ExchangeBase):
             return TradeFee(percent=percent_fees)
         # for taker idex v3 collects additional gas fee, collected in the asset received by the taker
         flat_fees = []
-        blockchain = get_idex_blockchain()
+        blockchain = get_idex_blockchain(domain=self._domain)
         gas_limit = get_gas_limit(blockchain)
         if self._exchange_info and 'gasPrice' in self._exchange_info:
             # resolve gas price from idex exchange endpoint

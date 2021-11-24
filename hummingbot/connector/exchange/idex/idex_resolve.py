@@ -50,13 +50,19 @@ def get_ws_url_for_domain(domain: str) -> str:
         raise Exception(f'Bad configuration of domain "{domain}"')
 
 
-def get_idex_blockchain() -> str:
+def get_idex_blockchain(domain=None) -> str:
     """Late loading of user selected blockchain from configuration"""
+    if domain in ("matic", "sandbox_matic"):
+        return 'MATIC'
     return _IDEX_BLOCKCHAIN or 'MATIC'
 
 
-def is_idex_sandbox() -> bool:
+def is_idex_sandbox(domain=None) -> bool:
     """Late loading of user selection of using sandbox from configuration"""
+    if domain == "matic":
+        return False
+    elif domain == "sandbox_matic":
+        return True
     return bool(_IS_IDEX_SANDBOX)
 
 

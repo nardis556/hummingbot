@@ -33,7 +33,7 @@ class IdexAPIUserStreamDataSource(UserStreamTrackerDataSource):
         cls._logger = cls._logger or logging.getLogger(__name__)
         return cls._logger
 
-    def __init__(self, idex_auth: IdexAuth, trading_pairs: Optional[List[str]] = [], domain: str = "matic"):
+    def __init__(self, idex_auth: IdexAuth, trading_pairs: Optional[List[str]] = [], domain: Optional[str] = "matic"):
         self._idex_auth = idex_auth
         self._trading_pairs = trading_pairs
         self._current_listen_key = None
@@ -77,7 +77,7 @@ class IdexAPIUserStreamDataSource(UserStreamTrackerDataSource):
         """
 
         while True:
-            idex_ws_feed = get_idex_ws_feed()
+            idex_ws_feed = get_idex_ws_feed(domain=self._domain)
             if DEBUG:
                 self.logger().info(f"Opening new connection to ws: {idex_ws_feed}")
             try:
@@ -89,7 +89,7 @@ class IdexAPIUserStreamDataSource(UserStreamTrackerDataSource):
 
                         "subscriptions": ["orders", "balances"],
                     }
-                    self.sub_token = await self._idex_auth.fetch_ws_token()
+                    self.sub_token = await self._idex_auth.fetch_ws_token(domain=self._domain)
                     subscribe_request.update({"token": self.sub_token})
                     # send sub request
                     await ws.send(json.dumps(subscribe_request))

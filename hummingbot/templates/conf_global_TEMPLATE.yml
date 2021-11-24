@@ -51,17 +51,9 @@ idex_api_key: null
 idex_api_secret_key: null
 idex_wallet_private_key: null
 
-idex_bsc_api_key: null
-idex_bsc_api_secret_key: null
-idex_bsc_wallet_private_key: null
-
-idex_sandbox_eth_api_key: null
-idex_sandbox_eth_api_secret_key: null
-idex_sandbox_eth_wallet_private_key: null
-
-idex_sandbox_bsc_api_key: null
-idex_sandbox_bsc_api_secret_key: null
-idex_sandbox_bsc_wallet_private_key: null
+idex_sandbox_matic_api_key: null
+idex_sandbox_matic_api_secret_key: null
+idex_sandbox_matic_wallet_private_key: null
 
 huobi_api_key: null
 huobi_secret_key: null
@@ -176,6 +168,8 @@ paper_trade_account_balance:
   WETH: 10
   USDC: 1000
   DAI: 1000
+  IDEX: 10000
+  USD: 1000
 
 telegram_enabled: false
 telegram_token: null

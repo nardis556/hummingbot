@@ -38,8 +38,8 @@ class IdexOrderBookTracker(OrderBookTracker):
 
     def __init__(self,
                  trading_pairs: Optional[List[str]] = None,
-                 domain: str = "matic"):
-        super().__init__(data_source=IdexAPIOrderBookDataSource(trading_pairs=trading_pairs),
+                 domain: Optional[str] = "matic"):
+        super().__init__(data_source=IdexAPIOrderBookDataSource(trading_pairs=trading_pairs, domain=domain),
                          trading_pairs=trading_pairs)
         self._ev_loop: asyncio.BaseEventLoop = asyncio.get_event_loop()
         self._order_book_snapshot_stream: asyncio.Queue = asyncio.Queue()
