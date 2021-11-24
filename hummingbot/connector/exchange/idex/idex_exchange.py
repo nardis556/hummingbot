@@ -72,8 +72,6 @@ class IdexExchange(ExchangeBase):
         :param trading_required: Whether actual trading is needed.
         """
         self._domain = domain
-        # todo alf: remove
-        self.logger().info(f"IdexExchange.__init__ called with domain {domain}")
         set_domain(domain)
         super().__init__()
         self._trading_required = trading_required
@@ -99,7 +97,7 @@ class IdexExchange(ExchangeBase):
         self._order_lock = asyncio.Lock()  # exclusive access for modifying orders
         # todo alf: remove
         self.logger().info(
-            f"Finalizing IdexExchange.__init__ called with domain {domain}>>>> get_idex_blockchain: {get_idex_blockchain()}, "
+            f"IdexExchange.__init__ called with domain {domain}>>>> get_idex_blockchain: {get_idex_blockchain()}, "
             f"get_idex_rest_url(None): {get_idex_rest_url()}, get_idex_rest_url({domain}): {get_idex_rest_url(domain)},"
         )
 

@@ -6,8 +6,6 @@ from hummingbot.core.event.events import OrderType, TradeType
 from hummingbot.core.utils.tracking_nonce import get_tracking_nonce
 
 
-# CENTRALIZED = False  # todo alf: probably remove
-
 EXAMPLE_PAIR = "IDEX-USD"
 DEFAULT_FEES = [0.1, 0.25]
 
@@ -133,6 +131,6 @@ OTHER_DOMAINS_KEYS = {
 }
 
 
-DEBUG = True
+DEBUG = True  # todo alf: set to false
 
 DISABLE_LISTEN_FOR_ORDERBOOK_DIFFS = True

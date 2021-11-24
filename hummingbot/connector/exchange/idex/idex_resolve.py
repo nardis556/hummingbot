@@ -19,7 +19,7 @@ _IS_IDEX_SANDBOX = None
 
 
 def set_domain(domain: str):
-    """Save user selected domain so we don't have to pass around domain to every method"""
+    """Save values corresponding to selected domain at module level"""
     global _IDEX_BLOCKCHAIN, _IS_IDEX_SANDBOX
 
     if domain == "matic":  # prod matic
@@ -28,24 +28,6 @@ def set_domain(domain: str):
     elif domain == "sandbox_matic":
         _IDEX_BLOCKCHAIN = 'MATIC'
         _IS_IDEX_SANDBOX = True
-    else:
-        raise Exception(f'Bad configuration of domain "{domain}"')
-
-
-def get_rest_url_for_domain(domain: str) -> str:
-    if domain == "matic":  # production uses polygon mainnet (matic)
-        return _IDEX_REST_URL_PROD_MATIC
-    elif domain == "sandbox_matic":
-        return _IDEX_REST_URL_SANDBOX_MATIC
-    else:
-        raise Exception(f'Bad configuration of domain "{domain}"')
-
-
-def get_ws_url_for_domain(domain: str) -> str:
-    if domain == "matic":  # production uses polygon mainnet (matic)
-        return _IDEX_WS_FEED_PROD_MATIC
-    elif domain == "sandbox_matic":
-        return _IDEX_WS_FEED_SANDBOX_MATIC
     else:
         raise Exception(f'Bad configuration of domain "{domain}"')
 
@@ -68,22 +50,30 @@ def is_idex_sandbox(domain=None) -> bool:
 
 def get_idex_rest_url(domain=None):
     """Late resolution of idex rest url to give time for configuration to load"""
-    if domain is not None:
-        # we need to pass the domain only if the method is called before the market is instantiated
-        return get_rest_url_for_domain(domain)
-    blockchain = get_idex_blockchain()
-    platform = 'SANDBOX' if is_idex_sandbox() else 'PROD'
-    return globals()[f'_IDEX_REST_URL_{platform}_{blockchain}']
+    if domain == "matic":  # production uses polygon mainnet (matic)
+        return _IDEX_REST_URL_PROD_MATIC
+    elif domain == "sandbox_matic":
+        return _IDEX_REST_URL_SANDBOX_MATIC
+    elif domain is None:  # no domain, use module level memory
+        blockchain = get_idex_blockchain()
+        platform = 'SANDBOX' if is_idex_sandbox() else 'PROD'
+        return globals()[f'_IDEX_REST_URL_{platform}_{blockchain}']
+    else:
+        raise Exception(f'Bad configuration of domain "{domain}"')
 
 
 def get_idex_ws_feed(domain=None):
     """Late resolution of idex WS url to give time for configuration to load"""
-    if domain is not None:
-        # we need to pass the domain only if the method is called before the market is instantiated
-        return get_ws_url_for_domain(domain)
-    blockchain = get_idex_blockchain()
-    platform = 'SANDBOX' if is_idex_sandbox() else 'PROD'
-    return globals()[f'_IDEX_WS_FEED_{platform}_{blockchain}']
+    if domain == "matic":  # production uses polygon mainnet (matic)
+        return _IDEX_WS_FEED_PROD_MATIC
+    elif domain == "sandbox_matic":
+        return _IDEX_WS_FEED_SANDBOX_MATIC
+    elif domain is None:  # no domain, use module level memory
+        blockchain = get_idex_blockchain()
+        platform = 'SANDBOX' if is_idex_sandbox() else 'PROD'
+        return globals()[f'_IDEX_WS_FEED_{platform}_{blockchain}']
+    else:
+        raise Exception(f'Bad configuration of domain "{domain}"')
 
 
 _throttler = None

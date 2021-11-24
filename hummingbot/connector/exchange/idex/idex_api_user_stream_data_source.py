@@ -12,13 +12,14 @@ import json
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-from hummingbot.connector.exchange.idex.idex_resolve import get_idex_ws_feed
-from hummingbot.connector.exchange.idex.idex_order_book import IdexOrderBook
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.core.utils.async_utils import safe_ensure_future
 from hummingbot.logger import HummingbotLogger
-from .idex_auth import IdexAuth
-from .idex_utils import DEBUG
+
+from hummingbot.connector.exchange.idex.idex_resolve import get_idex_ws_feed
+from hummingbot.connector.exchange.idex.idex_order_book import IdexOrderBook
+from hummingbot.connector.exchange.idex.idex_auth import IdexAuth
+from hummingbot.connector.exchange.idex.idex_utils import DEBUG
 
 
 class IdexAPIUserStreamDataSource(UserStreamTrackerDataSource):
@@ -33,9 +34,9 @@ class IdexAPIUserStreamDataSource(UserStreamTrackerDataSource):
         cls._logger = cls._logger or logging.getLogger(__name__)
         return cls._logger
 
-    def __init__(self, idex_auth: IdexAuth, trading_pairs: Optional[List[str]] = [], domain: Optional[str] = "matic"):
+    def __init__(self, idex_auth: IdexAuth, trading_pairs: Optional[List[str]] = None, domain: Optional[str] = "matic"):
         self._idex_auth = idex_auth
-        self._trading_pairs = trading_pairs
+        self._trading_pairs = trading_pairs or []
         self._current_listen_key = None
         self._listen_for_user_stream_task = None
         self._last_recv_time: float = 0
