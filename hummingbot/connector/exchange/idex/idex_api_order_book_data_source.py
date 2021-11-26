@@ -32,7 +32,9 @@ from hummingbot.connector.exchange.idex.idex_active_order_tracker import IdexAct
 from hummingbot.connector.exchange.idex.idex_order_book_tracker_entry import IdexOrderBookTrackerEntry
 from hummingbot.connector.exchange.idex.idex_order_book import IdexOrderBook
 from hummingbot.connector.exchange.idex.idex_resolve import get_idex_rest_url, get_idex_ws_feed, get_throttler
-from hummingbot.connector.exchange.idex.idex_utils import DEBUG, DISABLE_LISTEN_FOR_ORDERBOOK_DIFFS
+from hummingbot.connector.exchange.idex.idex_utils import (
+    DEBUG, DISABLE_LISTEN_FOR_ORDERBOOK_DIFFS, ORDER_BOOK_SNAPSHOT_REFRESH_TIME
+)
 
 MAX_RETRIES = 20
 NaN = float("nan")
@@ -385,11 +387,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
                         except Exception:
                             self.logger().error("Unexpected error.", exc_info=True)
                             await asyncio.sleep(5.0)
-                    # this_hour: pd.Timestamp = pd.Timestamp.utcnow().replace(minute=0, second=0, microsecond=0)
-                    # next_hour: pd.Timestamp = this_hour + pd.Timedelta(hours=1)
-                    # delta: float = next_hour.timestamp() - time.time()
-                    delta: float = 60 * 3  # todo alf: make this more decent. get value from idex_utils ?
-                    await asyncio.sleep(delta)  # todo alf: how frequent is this ? 1 x hour ? we must increase !!!!!
+                    await asyncio.sleep(ORDER_BOOK_SNAPSHOT_REFRESH_TIME)
             except asyncio.CancelledError:
                 raise
             except Exception:

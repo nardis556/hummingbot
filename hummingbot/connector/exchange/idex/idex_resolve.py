@@ -82,5 +82,5 @@ _throttler = None
 def get_throttler() -> Throttler:  # todo alf: check limits for v3
     global _throttler
     if _throttler is None:
-        _throttler = Throttler(rate_limit=(4, 1.0))  # rate_limit=(weight, t_period)
+        _throttler = Throttler(rate_limit=(5, 1.0))  # rate_limit=(weight, t_period)
     return _throttler

@@ -414,7 +414,7 @@ class IdexExchange(ExchangeBase):
             except IOError as e:
                 self.logger().error(f"_execute_cancel error: order {client_order_id} does not exist on Idex. "
                                     f"No cancellation performed: {str(e)}")
-                if "order not found" in str(e).lower():
+                if tracked_order is not None and "order not found" in str(e).lower():
                     # The order was never there to begin with. So cancelling it is a no-op but semantically successful.
                     self.stop_tracking_order(client_order_id)
                     self.trigger_event(MarketEvent.OrderCancelled,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from os.path import join, realpath
-import sys; sys.path.insert(0, realpath(join(__file__, "../../../")))
+import sys; sys.path.insert(0, realpath(join(__file__, "../../../../../")))
 
 from hummingbot.logger import HummingbotLogger
 
@@ -51,7 +51,7 @@ from hummingbot.model.sql_connection_manager import (
 from hummingbot.model.trade_fill import TradeFill
 from hummingbot.client.config.fee_overrides_config_map import fee_overrides_config_map
 from test.integration.humming_web_app import HummingWebApp
-from test.integration.assets.mock_data.fixture_idex import FixtureIdex
+from test.connector.exchange.idex.fixture_idex import FixtureIdex
 from test.integration.humming_ws_server import HummingWsServerFactory
 from unittest import mock
 

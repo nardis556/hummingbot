@@ -1,6 +1,6 @@
 import itertools
 from os.path import join, realpath
-import sys; sys.path.insert(0, realpath(join(__file__, "../../../")))
+import sys; sys.path.insert(0, realpath(join(__file__, "../../../../../")))
 import asyncio
 import inspect
 import unittest
@@ -13,7 +13,7 @@ from unittest.mock import patch, AsyncMock
 from decimal import Decimal
 
 from hummingbot.core.data_type.order_book_tracker_entry import OrderBookTrackerEntry
-from test.integration.assets.mock_data.fixture_idex import FixtureIdex
+from test.connector.exchange.idex.fixture_idex import FixtureIdex
 from hummingbot.connector.exchange.idex.idex_api_order_book_data_source import IdexAPIOrderBookDataSource
 from hummingbot.connector.exchange.idex.idex_order_book_message import IdexOrderBookMessage
 from hummingbot.core.data_type.order_book_message import OrderBookMessageType

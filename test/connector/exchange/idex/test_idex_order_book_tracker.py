@@ -2,7 +2,7 @@
 import datetime
 import math
 from os.path import join, realpath
-import sys; sys.path.insert(0, realpath(join(__file__, "../../../")))
+import sys; sys.path.insert(0, realpath(join(__file__, "../../../../../")))
 
 from hummingbot.core.event.event_logger import EventLogger
 from hummingbot.core.event.events import OrderBookEvent, OrderBookTradeEvent, TradeType
@@ -29,7 +29,7 @@ import hummingbot.connector.exchange.idex.idex_resolve
 
 # force resolution of api base url for conf values provided to this test
 hummingbot.connector.exchange.idex.idex_resolve._IS_IDEX_SANDBOX = True
-hummingbot.connector.exchange.idex.idex_resolve._IDEX_BLOCKCHAIN = 'ETH'
+hummingbot.connector.exchange.idex.idex_resolve._IDEX_BLOCKCHAIN = 'MATIC'
 
 
 # Set log level for this test
