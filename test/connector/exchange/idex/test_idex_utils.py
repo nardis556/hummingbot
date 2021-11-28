@@ -1,15 +1,18 @@
 import logging
 import unittest
 
-from hummingbot.connector.exchange.idex.idex_utils import validate_idex_contract_blockchain, IDEX_BLOCKCHAINS
+from os.path import join, realpath
+import sys; sys.path.insert(0, realpath(join(__file__, "../../../../../")))
+
+from hummingbot.connector.exchange.idex.idex_utils import validate_idex_contract_blockchain
 
 
 class TestUtils(unittest.TestCase):
 
     def test_validate_idex_contract_blockchain(self):
-        self.assertNotEqual(validate_idex_contract_blockchain("ETH"), f'Value ETH must be one of: {IDEX_BLOCKCHAINS}')
-        self.assertNotEqual(validate_idex_contract_blockchain("BSC"), f'Value BSC must be one of: {IDEX_BLOCKCHAINS}')
-        self.assertEqual(validate_idex_contract_blockchain("BAL"), f'Value BAL must be one of: {IDEX_BLOCKCHAINS}')
+        self.assertEqual(validate_idex_contract_blockchain("MATIC"), True)
+        with self.assertRaises(Exception):
+            validate_idex_contract_blockchain("ETH")
 
 
 def main():

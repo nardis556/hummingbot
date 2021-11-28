@@ -1,5 +1,3 @@
-from typing import Optional
-
 from hummingbot.client.config.config_var import ConfigVar
 from hummingbot.client.config.config_methods import using_exchange
 from hummingbot.core.event.events import OrderType, TradeType
@@ -21,9 +19,10 @@ HBOT_BROKER_ID = "HBOT-"
 IDEX_BLOCKCHAINS = ('MATIC', )
 
 
-def validate_idex_contract_blockchain(value: str) -> Optional[str]:
+def validate_idex_contract_blockchain(value: str) -> bool:
     if value not in IDEX_BLOCKCHAINS:
-        return f'Value {value} must be one of: {IDEX_BLOCKCHAINS}'
+        raise Exception(f'Value {value} must be one of: {IDEX_BLOCKCHAINS}')
+    return True
 
 
 def get_gas_limit(blockchain: str) -> int:

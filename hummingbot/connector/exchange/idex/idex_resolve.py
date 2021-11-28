@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from hummingbot.core.utils.asyncio_throttle import Throttler
 
 

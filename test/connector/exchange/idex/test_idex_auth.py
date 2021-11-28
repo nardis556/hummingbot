@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import os
 from os.path import join, realpath
 import sys; sys.path.insert(0, realpath(join(__file__, "../../../../../")))
 
@@ -20,38 +20,7 @@ from hummingbot.connector.exchange.idex.idex_auth import IdexAuth
 import conf
 
 
-"""
-In order to run the integration test please set environment variables with the API key, secret and ETH Wallet.
-Example in bash (these are not real api key and address, substitute your own):
-
-export IDEX_API_KEY='d88c5070-42ea-435f-ba26-8cb82064a972'
-export IDEX_API_SECRET_KEY='pLrUpy53o8enXTAHkOqsH8pLpQVMQ47p'
-export IDEX_WALLET_PRIVATE_KEY='ad10037142dc378b3f004bbb4803e24984b8d92969ec9407efb56a0135661576'
-"""
-
-
-IDEX_API_KEY = ''
-IDEX_API_SECRET_KEY = ''
-IDEX_WALLET_PRIVATE_KEY = ''
-IDEX_CONTRACT_BLOCKCHAIN = 'ETH'
-
-BASE_URL = 'https://api-sandbox-eth.idex.io/'  # rest url for sandbox (rinkeby) ETH chain
-
-
-def api_keys_provided():
-    return IDEX_API_KEY and IDEX_API_SECRET_KEY
-
-
-def eth_wallet_provided():
-    return IDEX_WALLET_PRIVATE_KEY
-
-
-# load config from Hummingbot's central debug conf
-# Values can be overridden by env variables (in uppercase). Example: export IDEX_WALLET_PRIVATE_KEY="1234567"
-if not api_keys_provided():
-    IDEX_API_KEY = getattr(conf, 'idex_api_key')
-    IDEX_API_SECRET_KEY = getattr(conf, 'idex_api_secret_key')
-    IDEX_WALLET_PRIVATE_KEY = getattr(conf, 'idex_wallet_private_key')
+IDEX_CONTRACT_BLOCKCHAIN = 'MATIC'
 
 
 class IdexAuthUnitTest(unittest.TestCase):
@@ -120,14 +89,13 @@ class TestIdexAuthIntegration(unittest.TestCase):
     example_response_user_detail = {
         'cancelEnabled': True,
         'depositEnabled': True,
-        'kycTier': 2,
-        'makerFeeRate': '0.001',
+        'makerFeeRate': '0.0010',
         'orderEnabled': True,
-        'takerFeeRate': '0.002',
+        'takerFeeRate': '0.0025',
+        'takerIdexFeeRate': '0.0005',
+        'takerLiquidityProviderFeeRate': '0.0020',
         'totalPortfolioValueUsd': '3623.60',
         'withdrawEnabled': True,
-        'withdrawalLimit': 'unlimited',
-        'withdrawalRemaining': 'unlimited'
     }
 
     example_response_balances = [
@@ -150,10 +118,15 @@ class TestIdexAuthIntegration(unittest.TestCase):
         {
             'baseAsset': 'DIL',
             'baseAssetPrecision': 8,
-            'market': 'DIL-ETH',
-            'quoteAsset': 'ETH',
+            'market': 'DIL-USD',
+            'quoteAsset': 'USD',
             'quoteAssetPrecision': 8,
-            'status': 'active'
+            'status': 'activeHybrid',
+            'makerFeeRate': '0.0010',
+            'takerFeeRate': '0.0025',
+            'takerIdexFeeRate': '0.0005',
+            'takerLiquidityProviderFeeRate': '0.0020',
+            'type': 'hybrid',
         },
     ]
 
@@ -207,15 +180,32 @@ class TestIdexAuthIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.ev_loop: asyncio.BaseEventLoop = asyncio.get_event_loop()
-        cls.base_url = BASE_URL
-        # you can inject values into conf by setting env variables with these names (in uppercase)
-        cls.api_key = IDEX_API_KEY                          # conf.idex_api_key
-        cls.secret_key = IDEX_API_SECRET_KEY                # conf.idex_api_secret_key
-        cls.wallet_private_key = IDEX_WALLET_PRIVATE_KEY    # conf.idex_wallet_private_key
-        cls.blockchain = IDEX_CONTRACT_BLOCKCHAIN
-        cls.idex_auth = IdexAuth(
-            api_key=cls.api_key, secret_key=cls.secret_key, wallet_private_key=cls.wallet_private_key,
+
+        api_key = (
+            getattr(conf, 'idex_sandbox_matic_api_key') or getattr(conf, 'idex_api_key') or
+            os.environ.get('IDEX_API_KEY', '--not-set--')
         )
+        secret_key = (
+            getattr(conf, 'idex_sandbox_matic_api_secret_key') or getattr(conf, 'idex_api_secret_key') or
+            os.environ.get('IDEX_API_SECRET_KEY', '--not-set--')
+        )
+        wallet_private_key = (
+            getattr(conf, 'idex_sandbox_matic_wallet_private_key') or getattr(conf, 'idex_wallet_private_key') or
+            os.environ.get('IDEX_WALLET_PRIVATE_KEY', '--not-set--')
+        )
+        domain = (
+            'sandbox_matic' if getattr(conf, 'idex_sandbox_matic_api_key') else os.environ.get('IDEX_DOMAIN', 'matic')
+        )
+        cls.idex_auth = IdexAuth(
+            api_key=api_key, secret_key=secret_key, wallet_private_key=wallet_private_key, domain=domain
+        )
+        cls.domain = domain
+        cls.api_key = api_key
+        cls.secret_key = secret_key
+        cls.wallet_private_key = wallet_private_key
+        cls.base_url = "https://api-sandbox-matic.idex.io" if domain.startswith('sandbox') else \
+            "https://api-matic.idex.io"
+        cls.blockchain = IDEX_CONTRACT_BLOCKCHAIN
 
     async def rest_get(self, url, headers=None, params=None):
         async with aiohttp.ClientSession() as client:
@@ -236,7 +226,7 @@ class TestIdexAuthIntegration(unittest.TestCase):
 
     def test_markets(self):
         """Test a public access route. GET /v1/markets"""
-        # base_url = 'https://api-sandbox-eth.idex.io/'  # rest url for sandbox (rinkeby) ETH chain
+        # base_url = 'https://api-sandbox-matic.idex.io'  # rest url for sandbox (mumbai) MATIC chain
         path = '/v1/markets'
         url = urljoin(self.base_url, path)
 
@@ -249,11 +239,10 @@ class TestIdexAuthIntegration(unittest.TestCase):
         for m_item in markets:
             self.assertEqual(set(m_item.keys()), set(self.example_response_markets[0].keys()))
 
-    @unittest.skipIf(not api_keys_provided(), 'IDEX_API_KEY env var missing')
     def test_user_details_access(self):
         """Tests HMAC authentication (user data level) by requesting GET /v1/user"""
 
-        # base_url = 'https://api-sandbox-eth.idex.io/'  # rest url for sandbox (rinkeby) ETH chain
+        # base_url = 'https://api-sandbox-matic.idex.io'  # rest url for sandbox (mumbai) MATIC chain
         path = '/v1/user'
         url = urljoin(self.base_url, path)
 
@@ -301,7 +290,6 @@ class TestIdexAuthIntegration(unittest.TestCase):
         self.assertEqual(set(user_details2.keys()), set(self.example_response_user_detail.keys()))
         # notice: user_details and user_details2 may not be equals as the totalPortfolioValueUsd may fluctuate
 
-    @unittest.skipIf(not api_keys_provided(), 'IDEX_API_KEY env var missing')
     def test_user_balance_access(self):
         """
         Test access to user balance (HMAC authentication): GET /v1/balances
@@ -309,7 +297,7 @@ class TestIdexAuthIntegration(unittest.TestCase):
         This test may fail if the user have not associated the ethereum wallet address with their account yet.
         See `test_associate_wallet` for how to associate the wallet with the account/api_key.
         """
-        # base_url = 'https://api-sandbox-eth.idex.io/'  # rest url for sandbox (rinkeby) ETH chain
+        # base_url = 'https://api-sandbox-matic.idex.io'  # rest url for sandbox (mumbai) MATIC chain
         path = '/v1/balances'
         url = urljoin(self.base_url, path)
 
@@ -338,15 +326,11 @@ class TestIdexAuthIntegration(unittest.TestCase):
             self.assertIsInstance(b_item, dict)
             self.assertEqual(set(b_item.keys()), set(self.example_response_balances[0].keys()))
 
-    @unittest.skipIf(
-        not api_keys_provided() or not eth_wallet_provided(),
-        'IDEX_API_KEY or IDEX_WALLET_PRIVATE_KEY env vars missing'
-    )
     def test_associate_wallet(self):
         """
         Tests trade level authentication (HMAC Header + ETH Wallet signature) with request: POST /v1/wallets
         """
-        # base_url = 'https://api-sandbox-eth.idex.io/'  # rest url for sandbox (rinkeby) ETH chain
+        # base_url = 'https://api-sandbox-matic.idex.io'  # rest url for sandbox (mumbai) MATIC chain
         path = '/v1/wallets'
         url = urljoin(self.base_url, path)
 
@@ -380,16 +364,12 @@ class TestIdexAuthIntegration(unittest.TestCase):
         self.assertIsInstance(response, dict)
         self.assertEqual(set(response.keys()), set(self.example_response_associate_wallet))
 
-    @unittest.skipIf(
-        not api_keys_provided() or not eth_wallet_provided(),
-        'IDEX_API_KEY or IDEX_WALLET_PRIVATE_KEY env vars missing'
-    )
     def test_create_order(self):
         """
         Tests create order to check trade level authentication (HMAC Header + ETH Wallet signature)
         with request: POST /v1/orders
         """
-        # base_url = 'https://api-sandbox-eth.idex.io/'  # rest url for sandbox (rinkeby) ETH chain
+        # base_url = 'https://api-sandbox-matic.idex.io'  # rest url for sandbox (mumbai) MATIC chain
         path = '/v1/orders'
         url = urljoin(self.base_url, path)
 
@@ -398,14 +378,14 @@ class TestIdexAuthIntegration(unittest.TestCase):
         order = {
             'nonce': self.idex_auth.get_nonce_str(),  # example: "9436afa0-9ee6-11ea-8a53-71994564322f",
             'wallet': self.idex_auth.get_wallet_address(),  # example: "0xA71C4aeeAabBBB8D2910F41C2ca3964b81F7310d"
-            'market': 'DIL-ETH',
+            'market': 'IDEX-USD',
             'type': 0,  # enum value for market orders
             'side': 0,  # enum value for buy
-            'quoteOrderQuantity': '100.00000000',
+            'quoteOrderQuantity': '12.00000000',
         }
 
         signature_parameters = (  # see idex doc: https://docs.idex.io/#associate-wallet
-            ('uint8', 1),      # 0 - The signature hash version is 1 for Ethereum, 2 for BSC
+            ('uint8', 103 if self.domain.startswith('sandbox') else 3),      # 0 - The signature hash version
 
             ('uint128', self.idex_auth.get_nonce_int()),  # 1 - Nonce
             ('address', order['wallet']),  # 2 - Signing wallet address
@@ -430,7 +410,7 @@ class TestIdexAuthIntegration(unittest.TestCase):
                 'nonce': order['nonce'],  # example: "9436afa0-9ee6-11ea-8a53-71994564322f",
                 'wallet': order['wallet'],  # example: "0xA71C4aeeAabBBB8D2910F41C2ca3964b81F7310d"
                 "market": order['market'],
-                "type": "market",  # todo: declare enums
+                "type": "market",
                 "side": "buy",
                 "quoteOrderQuantity": order['quoteOrderQuantity']
             },

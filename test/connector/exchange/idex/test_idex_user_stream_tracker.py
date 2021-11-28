@@ -14,6 +14,8 @@ from hummingbot.core.utils.async_utils import safe_ensure_future
 import conf
 
 
+# todo alf: fix this
+
 """
 To run this integration test before the idex connector is initialized you must set environment variables for API key,
 API secret and ETH Wallet. Example in bash (these are not real api key and address, substitute your own):

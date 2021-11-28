@@ -32,6 +32,8 @@ hummingbot.connector.exchange.idex.idex_resolve._IS_IDEX_SANDBOX = True
 hummingbot.connector.exchange.idex.idex_resolve._IDEX_BLOCKCHAIN = 'MATIC'
 
 
+# todo alf: fix this
+
 # Set log level for this test
 # LOG_LEVEL = logging.DEBUG
 LOG_LEVEL = logging.INFO
