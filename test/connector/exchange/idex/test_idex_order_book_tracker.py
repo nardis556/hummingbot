@@ -32,8 +32,6 @@ hummingbot.connector.exchange.idex.idex_resolve._IS_IDEX_SANDBOX = True
 hummingbot.connector.exchange.idex.idex_resolve._IDEX_BLOCKCHAIN = 'MATIC'
 
 
-# todo alf: fix this
-
 # Set log level for this test
 # LOG_LEVEL = logging.DEBUG
 LOG_LEVEL = logging.INFO
@@ -65,10 +63,9 @@ class IdexOrderBookTrackerUnitTest(unittest.TestCase):
         OrderBookEvent.TradeEvent
     ]
 
-    eth_sample_pairs: List[str] = [
-        "DIL-ETH",
-        "CUR-ETH",
-        "PIP-ETH"
+    matic_sample_pairs: List[str] = [
+        "DIL-USD",
+        "IDEX-USD",
     ]
 
     logger = None
@@ -78,7 +75,9 @@ class IdexOrderBookTrackerUnitTest(unittest.TestCase):
         cls.logger = logger()
         cls.ev_loop: asyncio.BaseEventLoop = asyncio.get_event_loop()
         cls.ev_loop.set_debug(True)
-        cls.order_book_tracker: IdexOrderBookTracker = IdexOrderBookTracker(trading_pairs=cls.eth_sample_pairs)
+        cls.order_book_tracker: IdexOrderBookTracker = IdexOrderBookTracker(
+            trading_pairs=cls.matic_sample_pairs, domain='sandbox_matic'
+        )
 
         cls.order_book_tracker_task: asyncio.Task = safe_ensure_future(cls.order_book_tracker.start())
         cls.ev_loop.run_until_complete(
@@ -122,7 +121,7 @@ class IdexOrderBookTrackerUnitTest(unittest.TestCase):
         for ob_trade_event in self.event_logger.event_log:
             print(f"ob_trade_event: {ob_trade_event}")
             self.assertTrue(type(ob_trade_event) == OrderBookTradeEvent)
-            self.assertTrue(ob_trade_event.trading_pair in self.eth_sample_pairs)
+            self.assertTrue(ob_trade_event.trading_pair in self.matic_sample_pairs)
             self.assertTrue(type(ob_trade_event.timestamp) == float)
             self.assertTrue(type(ob_trade_event.amount) == float)
             self.assertTrue(type(ob_trade_event.price) == float)
@@ -135,38 +134,28 @@ class IdexOrderBookTrackerUnitTest(unittest.TestCase):
         # Wait 5 seconds to process some diffs.
         self.ev_loop.run_until_complete(asyncio.sleep(10.0))
         order_books: Dict[str, OrderBook] = self.order_book_tracker.order_books
-        dil_eth_book: OrderBook = order_books["DIL-ETH"]
-        pip_eth_book: OrderBook = order_books["PIP-ETH"]
-        cur_eth_book: OrderBook = order_books["CUR-ETH"]
-        # print(dil_eth_book.snapshot)
-        # print(pip_eth_book.snapshot)
-        # print(cur_eth_book.snapshot)
-        self.assertGreaterEqual(dil_eth_book.get_price_for_volume(True, 1).result_price,
-                                dil_eth_book.get_price(True))
-        self.assertLessEqual(dil_eth_book.get_price_for_volume(False, 1).result_price,
-                             dil_eth_book.get_price(False))
-        self.assertGreaterEqual(pip_eth_book.get_price_for_volume(True, 3).result_price,
-                                pip_eth_book.get_price(True))
-        self.assertLessEqual(pip_eth_book.get_price_for_volume(False, 3).result_price,
-                             pip_eth_book.get_price(False))
-        self.assertGreaterEqual(cur_eth_book.get_price_for_volume(True, 10).result_price,
-                                cur_eth_book.get_price(True))
-        self.assertLessEqual(cur_eth_book.get_price_for_volume(False, 10).result_price,
-                             cur_eth_book.get_price(False))
+        dil_usd_book: OrderBook = order_books["DIL-USD"]
+        idex_usd_book: OrderBook = order_books["IDEX-USD"]
+        self.assertGreaterEqual(dil_usd_book.get_price_for_volume(True, 1).result_price,
+                                dil_usd_book.get_price(True))
+        self.assertLessEqual(dil_usd_book.get_price_for_volume(False, 1).result_price,
+                             dil_usd_book.get_price(False))
+        self.assertGreaterEqual(idex_usd_book.get_price_for_volume(True, 3).result_price,
+                                idex_usd_book.get_price(True))
+        self.assertLessEqual(idex_usd_book.get_price_for_volume(False, 3).result_price,
+                             idex_usd_book.get_price(False))
         for order_book in self.order_book_tracker.order_books.values():
             print(order_book.last_trade_price)
             self.assertFalse(math.isnan(order_book.last_trade_price))
 
     def test_api_get_last_traded_prices(self):
-        idex_ob_data_source = IdexAPIOrderBookDataSource(["DIL-ETH", "PIP-ETH", "CUR-ETH"])
-        prices = self.ev_loop.run_until_complete(idex_ob_data_source.get_last_traded_prices(["DIL-ETH",
-                                                                                             "PIP-ETH",
-                                                                                             "CUR-ETH"]))
+        idex_ob_data_source = IdexAPIOrderBookDataSource(["DIL-USD", "IDEX-USD"], domain='sandbox_matic')
+        prices = self.ev_loop.run_until_complete(idex_ob_data_source.get_last_traded_prices(["DIL-USD",
+                                                                                             "IDEX-USD"]))
         for key, value in prices.items():
             print(f"{key} last_trade_price: {value}")
-        self.assertGreater(prices["DIL-ETH"], 0.07)
-        self.assertLess(prices["PIP-ETH"], 0.06)
-        self.assertLess(prices["CUR-ETH"], 0.011)
+        self.assertGreater(prices["DIL-USD"], 0.07)
+        self.assertGreater(prices["IDEX-USD"], 0.1)
 
 
 def main():

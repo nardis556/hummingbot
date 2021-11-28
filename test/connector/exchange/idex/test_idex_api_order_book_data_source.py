@@ -60,7 +60,6 @@ class IdexAPIOrderBookDataSourceUnitTest(unittest.TestCase):
 
     def test_get_last_traded_price(self):
         with patch('aiohttp.ClientSession.get', new_callable=AsyncMock) as mocked_get:
-            # ETH URL
             for t_pair in self.matic_sample_pairs:
                 mocked_get.return_value.status = 200
                 mocked_get.return_value.json.return_value = FixtureIdex.TRADING_PAIR_TRADES
