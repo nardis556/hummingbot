@@ -39,7 +39,6 @@ from hummingbot.core.utils.async_utils import (
     safe_gather,
 )
 
-import hummingbot.connector.exchange.idex.idex_resolve
 from hummingbot.connector.exchange.idex.idex_exchange import IdexExchange
 from hummingbot.connector.markets_recorder import MarketsRecorder
 from hummingbot.model.market_state import MarketState
@@ -49,31 +48,18 @@ from hummingbot.model.sql_connection_manager import (
     SQLConnectionType
 )
 
-# todo alf: fix this mess
-
 
 from hummingbot.model.trade_fill import TradeFill
 from hummingbot.client.config.fee_overrides_config_map import fee_overrides_config_map
-from test.integration.humming_web_app import HummingWebApp
+from hummingbot.core.mock_api.mock_web_server import MockWebServer
 from test.connector.exchange.idex.fixture_idex import FixtureIdex
-from test.integration.humming_ws_server import HummingWsServerFactory
+from hummingbot.core.mock_api.mock_web_socket_server import MockWebSocketServerFactory
 from unittest import mock
 
 # API_SECRET length must be multiple of 4 otherwise base64.b64decode will fail
 API_MOCK_ENABLED = conf.mock_api_enabled is not None and conf.mock_api_enabled.lower() in ['true', 'yes', '1']
-API_BASE_URL = "https://api-eth.idex.io/"
-WS_BASE_URL = "wss://websocket-eth.idex.io/v1/"
-
-
-# load config from Hummingbot's central debug conf
-# Values can be overridden by env variables (in uppercase). Example: export IDEX_WALLET_PRIVATE_KEY="1234567"
-IDEX_API_KEY = getattr(conf, 'idex_api_key')
-IDEX_API_SECRET_KEY = getattr(conf, 'idex_api_secret_key')
-IDEX_WALLET_PRIVATE_KEY = getattr(conf, 'idex_wallet_private_key')
-
-# force resolution of api base url for conf values provided to this test
-hummingbot.connector.exchange.idex.idex_resolve._IS_IDEX_SANDBOX = True
-hummingbot.connector.exchange.idex.idex_resolve._IDEX_BLOCKCHAIN = 'ETH'
+API_BASE_URL = "https://api-sandbox-matic.idex.io"
+WS_BASE_URL = "wss://websocket-sandbox-matic.idex.io/v1"
 
 
 logging.basicConfig(level=logging.INFO)
@@ -102,14 +88,14 @@ class IdexExchangeUnitTest(unittest.TestCase):
     market: IdexExchange
     market_logger: EventLogger
     stack: contextlib.ExitStack
-    trading_pair = "DIL-ETH"
+    trading_pair = "IDEX-USD"
     base_token, quote_token = trading_pair.split("-")
 
     @classmethod
     def setUpClass(cls):
         cls.ev_loop = asyncio.get_event_loop()
         if API_MOCK_ENABLED:
-            cls.web_app = HummingWebApp.get_instance()
+            cls.web_app = MockWebServer.get_instance()
             cls.web_app.add_host_to_mock(API_BASE_URL, [])
             cls.web_app.start()
             cls.ev_loop.run_until_complete(cls.web_app.wait_til_started())
@@ -121,20 +107,38 @@ class IdexExchangeUnitTest(unittest.TestCase):
             cls.web_app.update_response("get", API_BASE_URL, "/v1/orders", FixtureIdex.ORDERS_STATUS)
             cls.web_app.update_response("delete", API_BASE_URL, "/v1/orders", FixtureIdex.CANCEL)
 
-            HummingWsServerFactory.start_new_server(WS_BASE_URL)
+            MockWebSocketServerFactory.start_new_server(WS_BASE_URL)
             cls._ws_patcher = unittest.mock.patch("websockets.connect", autospec=True)
             cls._ws_mock = cls._ws_patcher.start()
-            cls._ws_mock.side_effect = HummingWsServerFactory.reroute_ws_connect
+            cls._ws_mock.side_effect = MockWebSocketServerFactory.reroute_ws_connect
 
             cls._t_nonce_patcher = unittest.mock.patch("hummingbot.core.utils.tracking_nonce.get_tracking_nonce")
             cls._t_nonce_mock = cls._t_nonce_patcher.start()
         cls.clock: Clock = Clock(ClockMode.REALTIME)
+
+        cls.api_key = (
+            getattr(conf, 'idex_sandbox_matic_api_key', None) or getattr(conf, 'idex_api_key', None) or
+            os.environ.get('IDEX_API_KEY', '--not-set--')
+        )
+        cls.secret_key = (
+            getattr(conf, 'idex_sandbox_matic_api_secret_key', None) or getattr(conf, 'idex_api_secret_key', None) or
+            os.environ.get('IDEX_API_SECRET_KEY', '--not-set--')
+        )
+        cls.wallet_private_key = (
+            getattr(conf, 'idex_sandbox_matic_wallet_private_key', None) or
+            getattr(conf, 'idex_wallet_private_key', None) or os.environ.get('IDEX_WALLET_PRIVATE_KEY', '--not-set--')
+        )
+        cls.domain = (
+            'sandbox_matic' if getattr(conf, 'idex_sandbox_matic_api_key', None) else
+            os.environ.get('IDEX_DOMAIN', 'sandbox_matic')
+        )
+
         cls.market: IdexExchange = IdexExchange(
-            idex_api_key=IDEX_API_KEY,
-            idex_api_secret_key=IDEX_API_SECRET_KEY,
-            idex_wallet_private_key=IDEX_WALLET_PRIVATE_KEY,
+            idex_api_key=cls.api_key,
+            idex_api_secret_key=cls.secret_key,
+            idex_wallet_private_key=cls.wallet_private_key,
             trading_pairs=[cls.trading_pair],
-            domain='sandbox_eth'
+            domain=cls.domain
         )
         print("Initializing Idex market... this will take about a minute.")
         cls.clock.add_iterator(cls.market)
@@ -200,28 +204,28 @@ class IdexExchangeUnitTest(unittest.TestCase):
     # Both fee tests pass, but I don't think they fully account for the gas cost calculated in the idex_exchange.
 
     def test_get_fee(self):
-        limit_fee: TradeFee = self.market.get_fee("DIL", "ETH", OrderType.LIMIT_MAKER, TradeType.BUY, 1, 1)
+        limit_fee: TradeFee = self.market.get_fee("IDEX", "USD", OrderType.LIMIT_MAKER, TradeType.BUY, 1, 1)
         self.assertGreater(limit_fee.percent, 0)
         self.assertEqual(len(limit_fee.flat_fees), 0)
-        market_fee: TradeFee = self.market.get_fee("DIL", "ETH", OrderType.LIMIT, TradeType.BUY, 1)
+        market_fee: TradeFee = self.market.get_fee("IDEX", "USD", OrderType.LIMIT, TradeType.BUY, 1)
         self.assertGreater(market_fee.percent, 0)
         self.assertEqual(len(market_fee.flat_fees), 1)
 
     def test_fee_overrides_config(self):
         fee_overrides_config_map["idex_taker_fee"].value = None
-        taker_fee: TradeFee = self.market.get_fee("DIL", "ETH", OrderType.LIMIT, TradeType.BUY, Decimal(1),
+        taker_fee: TradeFee = self.market.get_fee("IDEX", "USD", OrderType.LIMIT, TradeType.BUY, Decimal(1),
                                                   Decimal('0.1'))
-        self.assertAlmostEqual(Decimal("0.002"), taker_fee.percent)
+        self.assertAlmostEqual(Decimal("0.0025"), taker_fee.percent)
         fee_overrides_config_map["idex_taker_fee"].value = Decimal('0.75')
-        taker_fee: TradeFee = self.market.get_fee("DIL", "ETH", OrderType.LIMIT, TradeType.BUY, Decimal(1),
+        taker_fee: TradeFee = self.market.get_fee("IDEX", "USD", OrderType.LIMIT, TradeType.BUY, Decimal(1),
                                                   Decimal('0.1'))
         self.assertAlmostEqual(Decimal("0.0075"), taker_fee.percent)
         fee_overrides_config_map["idex_maker_fee"].value = None
-        maker_fee: TradeFee = self.market.get_fee("DIL", "ETH", OrderType.LIMIT_MAKER, TradeType.BUY, Decimal(1),
+        maker_fee: TradeFee = self.market.get_fee("IDEX", "USD", OrderType.LIMIT_MAKER, TradeType.BUY, Decimal(1),
                                                   Decimal('0.1'))
         self.assertAlmostEqual(Decimal("0.001"), maker_fee.percent)
         fee_overrides_config_map["idex_maker_fee"].value = Decimal('0.75')
-        maker_fee: TradeFee = self.market.get_fee("DIL", "ETH", OrderType.LIMIT_MAKER, TradeType.BUY, Decimal(1),
+        maker_fee: TradeFee = self.market.get_fee("IDEX", "USD", OrderType.LIMIT_MAKER, TradeType.BUY, Decimal(1),
                                                   Decimal('0.1'))
         self.assertAlmostEqual(Decimal("0.0075"), maker_fee.percent)
 
@@ -242,7 +246,7 @@ class IdexExchangeUnitTest(unittest.TestCase):
             resp = fixture_ws.copy()
             resp["order_id"] = exchange_order_id
             resp["side"] = side
-            HummingWsServerFactory.send_json_threadsafe(WS_BASE_URL, resp, delay=0.1)
+            MockWebSocketServerFactory.send_json_threadsafe(WS_BASE_URL, resp, delay=0.1)
         return order_id, exchange_order_id
 
     def _cancel_order(self, trading_pair, order_id, exchange_order_id, fixture_ws):
@@ -252,12 +256,13 @@ class IdexExchangeUnitTest(unittest.TestCase):
         if API_MOCK_ENABLED:
             resp = fixture_ws.copy()
             resp["orderId"] = exchange_order_id
-            HummingWsServerFactory.send_json_threadsafe(WS_BASE_URL, resp, delay=0.1)
+            MockWebSocketServerFactory.send_json_threadsafe(WS_BASE_URL, resp, delay=0.1)
 
     def test_limit_taker_buy(self):
-        self.assertGreater(self.market.get_balance("ETH"), Decimal("0.05"))
-        trading_pair = "DIL-ETH"
-        price: Decimal = self.market.get_price(trading_pair, True)
+        self.assertGreater(self.market.get_balance("IDEX"), Decimal("0.05"))
+        trading_pair = "IDEX-USD"
+        price: Decimal = self.market.get_price(trading_pair, is_buy=True)
+        price: Decimal = price + Decimal(0.05) * price  # overpay by 5% so the order is processed quickly
         amount: Decimal = Decimal("1.5")
         quantized_amount: Decimal = self.market.quantize_order_amount(trading_pair, amount)
         order_id, _ = self._place_order(True, trading_pair, amount, OrderType.LIMIT, price, 10001,
@@ -269,11 +274,11 @@ class IdexExchangeUnitTest(unittest.TestCase):
         base_amount_traded: Decimal = sum(t.amount for t in trade_events)
         quote_amount_traded: Decimal = sum(t.amount * t.price for t in trade_events)
 
-        self.assertTrue([evt.order_type == OrderType.LIMIT_MAKER for evt in trade_events])
+        self.assertTrue([evt.order_type == OrderType.LIMIT for evt in trade_events])
         self.assertEqual(order_id, order_completed_event.order_id)
         self.assertAlmostEqual(quantized_amount, order_completed_event.base_asset_amount)
-        self.assertEqual("DIL", order_completed_event.base_asset)
-        self.assertEqual("ETH", order_completed_event.quote_asset)
+        self.assertEqual("IDEX", order_completed_event.base_asset)
+        self.assertEqual("USD", order_completed_event.quote_asset)
         self.assertAlmostEqual(base_amount_traded, order_completed_event.base_asset_amount)
         self.assertAlmostEqual(quote_amount_traded, order_completed_event.quote_asset_amount)
         self.assertTrue(any([isinstance(event, BuyOrderCreatedEvent) and event.order_id == order_id
@@ -282,8 +287,9 @@ class IdexExchangeUnitTest(unittest.TestCase):
         self.market_logger.clear()
 
     def test_limit_taker_sell(self):
-        trading_pair = "DIL-ETH"
-        price: Decimal = self.market.get_price(trading_pair, False)
+        trading_pair = "IDEX-USD"
+        price: Decimal = self.market.get_price(trading_pair, is_buy=False)
+        price: Decimal = price - Decimal(0.05) * price  # sell 5% cheaper than top ask price to get filled quickly
         amount: Decimal = Decimal("1.5")
         quantized_amount: Decimal = self.market.quantize_order_amount(trading_pair, amount)
 
@@ -295,11 +301,11 @@ class IdexExchangeUnitTest(unittest.TestCase):
         base_amount_traded = sum(t.amount for t in trade_events)
         quote_amount_traded = sum(t.amount * t.price for t in trade_events)
 
-        self.assertTrue([evt.order_type == OrderType.LIMIT_MAKER for evt in trade_events])
+        self.assertTrue([evt.order_type == OrderType.LIMIT for evt in trade_events])
         self.assertEqual(order_id, order_completed_event.order_id)
         self.assertAlmostEqual(quantized_amount, order_completed_event.base_asset_amount)
-        self.assertEqual("DIL", order_completed_event.base_asset)
-        self.assertEqual("ETH", order_completed_event.quote_asset)
+        self.assertEqual("IDEX", order_completed_event.base_asset)
+        self.assertEqual("USD", order_completed_event.quote_asset)
         self.assertAlmostEqual(base_amount_traded, order_completed_event.base_asset_amount)
         self.assertAlmostEqual(quote_amount_traded, order_completed_event.quote_asset_amount)
         self.assertTrue(any([isinstance(event, SellOrderCreatedEvent) and event.order_id == order_id
@@ -308,11 +314,11 @@ class IdexExchangeUnitTest(unittest.TestCase):
         self.market_logger.clear()
 
     def test_cancel_order(self):
-        trading_pair = "DIL-ETH"
+        trading_pair = "IDEX-USD"
 
-        current_bid_price: Decimal = self.market.get_price(trading_pair, True)
+        current_bid_price: Decimal = self.market.get_price(trading_pair, is_buy=True)
         amount: Decimal = Decimal("5.0")
-        self.assertGreater(self.market.get_balance("DIL"), amount)
+        self.assertGreater(self.market.get_balance("IDEX"), amount)
 
         bid_price: Decimal = current_bid_price - Decimal("0.1") * current_bid_price
         quantize_bid_price: Decimal = self.market.quantize_order_price(trading_pair, bid_price)
@@ -326,7 +332,7 @@ class IdexExchangeUnitTest(unittest.TestCase):
         self.assertEqual(order_cancelled_event.order_id, order_id)
 
     def test_cancel_all(self):
-        trading_pair = "DIL-ETH"
+        trading_pair = "IDEX-USD"
         bid_price: Decimal = self.market.get_price(trading_pair, True) * Decimal("0.5")
         ask_price: Decimal = self.market.get_price(trading_pair, False) * 2
         amount: Decimal = 1 / bid_price
@@ -351,18 +357,18 @@ class IdexExchangeUnitTest(unittest.TestCase):
         if API_MOCK_ENABLED:
             resp = FixtureIdex.WS_ORDER_CANCELLED.copy()
             resp["orderId"] = exchange_order_id
-            HummingWsServerFactory.send_json_threadsafe(WS_BASE_URL, resp, delay=0.1)
+            MockWebSocketServerFactory.send_json_threadsafe(WS_BASE_URL, resp, delay=0.1)
             resp = FixtureIdex.WS_ORDER_CANCELLED.copy()
             resp["orderId"] = exchange_order_id_2
-            HummingWsServerFactory.send_json_threadsafe(WS_BASE_URL, resp, delay=0.11)
+            MockWebSocketServerFactory.send_json_threadsafe(WS_BASE_URL, resp, delay=0.11)
         for cr in cancellation_results:
             self.logger().info(f"Cancellation Result: {cr.success}")
             self.assertEqual(cr.success, True)
 
-    @unittest.skipUnless(any("test_list_orders" in arg for arg in sys.argv), "List order test requires manual action.")
+    # @unittest.skipUnless(any("test_list_orders" in arg for arg in sys.argv), "List order test requires manual action.")
     def test_list_orders(self):
         self.assertGreater(self.market.get_balance("DIL"), Decimal("0.1"))
-        trading_pair = "DIL-ETH"
+        trading_pair = "IDEX-USD"
         amount: Decimal = Decimal("0.02")
         quantized_amount: Decimal = self.market.quantize_order_amount(trading_pair, amount)
 
@@ -380,7 +386,7 @@ class IdexExchangeUnitTest(unittest.TestCase):
     def test_orders_saving_and_restoration(self):
         config_path: str = "test_config"
         strategy_name: str = "test_strategy"
-        trading_pair: str = "DIL-ETH"
+        trading_pair: str = "IDEX-USD"
         sql: SQLConnectionManager = SQLConnectionManager(SQLConnectionType.TRADE_FILLS, db_path=self.db_path)
         order_id: Optional[str] = None
         recorder: MarketsRecorder = MarketsRecorder(sql, [self.market], config_path, strategy_name)
@@ -389,7 +395,7 @@ class IdexExchangeUnitTest(unittest.TestCase):
         try:
             self.assertEqual(0, len(self.market.tracking_states))
 
-            # Try to put limit buy order for 0.04 ETH, and watch for order creation event.
+            # Try to put limit buy order of IDEX, and watch for order creation event.
             current_bid_price: Decimal = self.market.get_price(trading_pair, True)
             bid_price: Decimal = current_bid_price * Decimal("0.8")
             quantize_bid_price: Decimal = self.market.quantize_order_price(trading_pair, bid_price)
@@ -424,11 +430,11 @@ class IdexExchangeUnitTest(unittest.TestCase):
             for event_tag in self.events:
                 self.market.remove_listener(event_tag, self.market_logger)
             self.market: IdexExchange = IdexExchange(
-                idex_api_key=IDEX_API_KEY,
-                idex_api_secret_key=IDEX_API_SECRET_KEY,
-                idex_wallet_private_key=IDEX_WALLET_PRIVATE_KEY,
+                idex_api_key=self.api_key,
+                idex_api_secret_key=self.secret_key,
+                idex_wallet_private_key=self.wallet_private_key,
                 trading_pairs=[trading_pair],
-                domain='sandbox_eth'
+                domain=self.domain
             )
             for event_tag in self.events:
                 self.market.add_listener(event_tag, self.market_logger)
@@ -472,16 +478,17 @@ class IdexExchangeUnitTest(unittest.TestCase):
     def test_order_fill_record(self):
         config_path: str = "test_config"
         strategy_name: str = "test_strategy"
-        trading_pair: str = "DIL-ETH"
+        trading_pair: str = "IDEX-USD"
         sql: SQLConnectionManager = SQLConnectionManager(SQLConnectionType.TRADE_FILLS, db_path=self.db_path)
         order_id: Optional[str] = None
         recorder: MarketsRecorder = MarketsRecorder(sql, [self.market], config_path, strategy_name)
         recorder.start()
 
         try:
-            # Try to buy 0.04 ETH from the exchange, and watch for completion event.
-            price: Decimal = self.market.get_price(trading_pair, True)
-            amount: Decimal = Decimal("2.002")  # let's try to buy 2.002 DIL
+            # Try to buy IDEX from the exchange, and watch for completion event.
+            price: Decimal = self.market.get_price(trading_pair, is_buy=True)
+            price: Decimal = price + Decimal(0.05) * price  # overpay by 5% so the order is processed quickly
+            amount: Decimal = Decimal("2.002")  # let's try to buy 2.002 IDEX
             order_id, exchange_order_id = self._place_order(True, trading_pair, amount, OrderType.LIMIT, price, 10001,
                                                             FixtureIdex.BUY_MARKET_ORDER,
                                                             FixtureIdex.WS_AFTER_MARKET_BUY_2)
@@ -490,8 +497,9 @@ class IdexExchangeUnitTest(unittest.TestCase):
             # Reset the logs
             self.market_logger.clear()
 
-            # Try to sell back the same amount of ETH to the exchange, and watch for completion event.
-            price: Decimal = self.market.get_price(trading_pair, False)
+            # Try to sell back the same amount of IDEX to the exchange, and watch for completion event.
+            price: Decimal = self.market.get_price(trading_pair, is_buy=False)
+            price: Decimal = price - Decimal(0.05) * price  # sell 5% cheaper than top ask price to get filled quickly
             amount = buy_order_completed_event.base_asset_amount
             order_id, exchange_order_id = self._place_order(False, trading_pair, amount, OrderType.LIMIT, price, 10002,
                                                             FixtureIdex.SELL_MARKET_ORDER,
