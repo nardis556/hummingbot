@@ -20,6 +20,17 @@ from hummingbot.connector.exchange.idex.idex_auth import IdexAuth
 import conf
 
 
+"""
+To run this integration test before the idex connector is initialized you must set environment variables for API key,
+API secret and ETH Wallet. Example in bash (these are not real api key and address, substitute your own):
+
+export IDEX_API_KEY='d88c5070-42ea-435f-ba26-8cb82064a972'
+export IDEX_API_SECRET_KEY='pLrUpy53o8enXTAHkOqsH8pLpQVMQ47p'
+export IDEX_WALLET_PRIVATE_KEY='ad10037142dc378b3f004bbb4803e24984b8d92969ec9407efb56a0135661576'
+export IDEX_DOMAIN='sandbox_matic'
+"""
+
+
 IDEX_CONTRACT_BLOCKCHAIN = 'MATIC'
 
 
@@ -182,19 +193,20 @@ class TestIdexAuthIntegration(unittest.TestCase):
         cls.ev_loop: asyncio.BaseEventLoop = asyncio.get_event_loop()
 
         api_key = (
-            getattr(conf, 'idex_sandbox_matic_api_key') or getattr(conf, 'idex_api_key') or
+            getattr(conf, 'idex_sandbox_matic_api_key', None) or getattr(conf, 'idex_api_key', None) or
             os.environ.get('IDEX_API_KEY', '--not-set--')
         )
         secret_key = (
-            getattr(conf, 'idex_sandbox_matic_api_secret_key') or getattr(conf, 'idex_api_secret_key') or
+            getattr(conf, 'idex_sandbox_matic_api_secret_key', None) or getattr(conf, 'idex_api_secret_key', None) or
             os.environ.get('IDEX_API_SECRET_KEY', '--not-set--')
         )
         wallet_private_key = (
-            getattr(conf, 'idex_sandbox_matic_wallet_private_key') or getattr(conf, 'idex_wallet_private_key') or
-            os.environ.get('IDEX_WALLET_PRIVATE_KEY', '--not-set--')
+            getattr(conf, 'idex_sandbox_matic_wallet_private_key', None) or
+            getattr(conf, 'idex_wallet_private_key', None) or os.environ.get('IDEX_WALLET_PRIVATE_KEY', '--not-set--')
         )
         domain = (
-            'sandbox_matic' if getattr(conf, 'idex_sandbox_matic_api_key') else os.environ.get('IDEX_DOMAIN', 'matic')
+            'sandbox_matic' if getattr(conf, 'idex_sandbox_matic_api_key', None) else
+            os.environ.get('IDEX_DOMAIN', 'matic')
         )
         cls.idex_auth = IdexAuth(
             api_key=api_key, secret_key=secret_key, wallet_private_key=wallet_private_key, domain=domain
