@@ -95,11 +95,6 @@ class IdexExchange(ExchangeBase):
         self._exchange_info = None  # stores info about the exchange. Periodically polled from GET /v1/exchange
         self._market_info = None    # stores info about the markets. Periodically polled from GET /v1/markets
         self._order_lock = asyncio.Lock()  # exclusive access for modifying orders
-        # todo alf: remove
-        self.logger().info(
-            f"IdexExchange.__init__ called with domain {domain}>>>> get_idex_blockchain: {get_idex_blockchain()}, "
-            f"get_idex_rest_url(None): {get_idex_rest_url()}, get_idex_rest_url({domain}): {get_idex_rest_url(domain)},"
-        )
 
     @property
     def trading_rules(self) -> Dict[str, TradingRule]:
@@ -513,7 +508,6 @@ class IdexExchange(ExchangeBase):
                 trade_type = OrderSideEnum.sell
 
             signature_parameters = self._idex_auth.build_signature_params_for_order(
-                # TODO: Did not include: stop_price, time_in_force, and selftrade_prevention. Add later as required.
                 market=params["market"],
                 order_type=order_type,
                 order_side=trade_type,
@@ -642,7 +636,7 @@ class IdexExchange(ExchangeBase):
                 amount = self.quantize_order_amount(trading_pair, amount)
                 price = self.quantize_order_price(trading_pair, price)
 
-                if amount < trading_rule.min_order_size:  # todo alf: this may not be true. Research
+                if amount < trading_rule.min_order_size:
                     raise ValueError(f"Buy order amount {amount} is lower than the minimum order size "
                                      f"{trading_rule.min_order_size}. client_order_id: {client_order_id}")
 

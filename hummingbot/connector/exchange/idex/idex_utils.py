@@ -130,7 +130,7 @@ OTHER_DOMAINS_KEYS = {
 }
 
 
-DEBUG = True  # todo alf: set to false
+DEBUG = False
 
 DISABLE_LISTEN_FOR_ORDERBOOK_DIFFS = True
 

@@ -1,9 +1,6 @@
 import json
 
 
-# todo alf: fix this
-
-
 class FixtureIdex:
     # General Exchange Info
     MARKETS = None

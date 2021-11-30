@@ -148,11 +148,6 @@ class IdexAuth:
         private_key = private_key or self._wallet_private_key
         return Account.from_key(private_key)
 
-    def get_wallet_bytes(self, private_key: str = None) -> str:  # todo: remove !!!
-        raise PendingDeprecationWarning
-        # private_key = private_key or self.wallet_private_key
-        # return IdexAuth.remove0x_prefix(Account.from_key(private_key).address)
-
     def generate_auth_dict(
             self,
             http_method: str,
