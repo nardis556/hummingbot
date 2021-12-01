@@ -168,8 +168,6 @@ paper_trade_account_balance:
   WETH: 10
   USDC: 1000
   DAI: 1000
-  IDEX: 10000
-  USD: 1000
 
 telegram_enabled: false
 telegram_token: null
