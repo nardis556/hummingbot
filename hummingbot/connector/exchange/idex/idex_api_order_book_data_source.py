@@ -31,7 +31,9 @@ from hummingbot.core.utils.async_utils import safe_gather
 from hummingbot.connector.exchange.idex.idex_active_order_tracker import IdexActiveOrderTracker
 from hummingbot.connector.exchange.idex.idex_order_book_tracker_entry import IdexOrderBookTrackerEntry
 from hummingbot.connector.exchange.idex.idex_order_book import IdexOrderBook
-from hummingbot.connector.exchange.idex.idex_resolve import get_idex_rest_url, get_idex_ws_feed, get_throttler
+from hummingbot.connector.exchange.idex.idex_resolve import (
+    get_idex_rest_url, get_idex_ws_feed, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID
+)
 from hummingbot.connector.exchange.idex.idex_utils import (
     DEBUG, DISABLE_LISTEN_FOR_ORDERBOOK_DIFFS, ORDER_BOOK_SNAPSHOT_REFRESH_TIME
 )
@@ -70,7 +72,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     @classmethod
     async def get_last_traded_price(cls, trading_pair: str, base_url: str = "https://api-matic.idex.io") -> float:
-        async with get_throttler().weighted_task(request_weight=1):
+        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             async with aiohttp.ClientSession() as client:
                 url = f"{base_url}/v1/trades/?market={trading_pair}"
                 resp = await client.get(url)
@@ -102,7 +104,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     @staticmethod
     async def fetch_trading_pairs(domain: Optional[str] = None) -> List[str]:
-        async with get_throttler().weighted_task(request_weight=1):
+        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             try:
                 async with aiohttp.ClientSession() as client:
                     # ensure IDEX_REST_URL has appropriate blockchain imported (MATIC)
@@ -128,8 +130,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
         Fetches order book snapshot for a particular trading pair from the rest API
         :returns: Response from the rest API
         """
-        async with get_throttler().weighted_task(request_weight=1):
-            # idex level 2 order book is sufficient to provide required data
+        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             base_url: str = get_idex_rest_url(domain=domain)
             product_order_book_url: str = f"{base_url}/v1/orderbook?market={trading_pair}&level=2"
             async with client.get(product_order_book_url) as response:

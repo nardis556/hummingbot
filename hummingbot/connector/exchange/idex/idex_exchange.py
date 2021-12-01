@@ -32,7 +32,8 @@ from hummingbot.connector.exchange.idex.idex_utils import (
     get_gas_limit,
 )
 from hummingbot.connector.exchange.idex.idex_resolve import (
-    get_idex_rest_url, get_idex_blockchain, set_domain, get_throttler
+    get_idex_rest_url, get_idex_blockchain, set_domain, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID,
+    HTTP_USER_ENDPOINTS_LIMIT_ID
 )
 from hummingbot.core.utils import async_ttl_cache
 from hummingbot.logger import HummingbotLogger
@@ -438,7 +439,7 @@ class IdexExchange(ExchangeBase):
 
     async def get_ping(self):
         """Requests status of current connection."""
-        async with get_throttler().weighted_task(request_weight=1):
+        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/ping/"
             session: aiohttp.ClientSession = await self._http_client()
@@ -449,7 +450,7 @@ class IdexExchange(ExchangeBase):
 
     async def list_orders(self) -> List[Dict[str, Any]]:
         """Requests status of all active orders. Returns json data of all orders associated with wallet address"""
-        async with get_throttler().weighted_task(request_weight=1):
+        async with get_throttler().execute_task(HTTP_USER_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/orders"
             params = {
@@ -466,7 +467,7 @@ class IdexExchange(ExchangeBase):
 
     async def get_order(self, exchange_order_id: str) -> Dict[str, Any]:
         """Requests order information through API with exchange order Id. Returns json data with order details"""
-        async with get_throttler().weighted_task(request_weight=1):
+        async with get_throttler().execute_task(HTTP_USER_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/orders"
             params = {
@@ -486,7 +487,7 @@ class IdexExchange(ExchangeBase):
 
     async def post_order(self, params) -> Dict[str, Any]:
         """Posts an order request to the Idex API. Returns json data with order details"""
-        async with get_throttler().weighted_task(request_weight=1):
+        async with get_throttler().execute_task(HTTP_USER_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/orders"
 
@@ -538,7 +539,7 @@ class IdexExchange(ExchangeBase):
         Deletes an order or all orders associated with a wallet from the Idex API.
         Returns json data with order id confirming deletion
         """
-        async with get_throttler().weighted_task(request_weight=1):
+        async with get_throttler().execute_task(HTTP_USER_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/orders"
 
@@ -571,7 +572,7 @@ class IdexExchange(ExchangeBase):
 
     async def get_balances_from_api(self) -> List[Dict[str, Any]]:
         """Requests current balances of all assets through API. Returns json data with balance details"""
-        async with get_throttler().weighted_task(request_weight=1):
+        async with get_throttler().execute_task(HTTP_USER_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/balances"
             params = {
@@ -588,7 +589,7 @@ class IdexExchange(ExchangeBase):
 
     async def get_exchange_info_from_api(self) -> Dict[str, Any]:
         """Requests basic info about idex exchange. We are mostly interested in the gas price in gwei"""
-        async with get_throttler().weighted_task(request_weight=1):
+        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/exchange"
             session: aiohttp.ClientSession = await self._http_client()
@@ -599,7 +600,7 @@ class IdexExchange(ExchangeBase):
 
     async def get_market_info_from_api(self) -> List[Dict]:
         """Requests all markets (trading pairs) available to Idex users."""
-        async with get_throttler().weighted_task(request_weight=1):
+        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/markets"
             session: aiohttp.ClientSession = await self._http_client()

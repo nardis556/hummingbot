@@ -1,7 +1,8 @@
-from hummingbot.core.utils.asyncio_throttle import Throttler
-
+from hummingbot.core.api_throttler.async_throttler import AsyncThrottler
 
 # IDEX v3 REST API url for production and sandbox (users may need to modify this someday)
+from hummingbot.core.api_throttler.data_types import RateLimit
+
 _IDEX_REST_URL_PROD_MATIC = "https://api-matic.idex.io"
 _IDEX_REST_URL_SANDBOX_MATIC = "https://api-sandbox-matic.idex.io"
 
@@ -74,11 +75,25 @@ def get_idex_ws_feed(domain=None):
         raise Exception(f'Bad configuration of domain "{domain}"')
 
 
+# Pool IDs for AsyncThrottler
+HTTP_PUBLIC_ENDPOINTS_LIMIT_ID = "PublicAccessHTTP"
+HTTP_USER_ENDPOINTS_LIMIT_ID = "UserAccessHTTP"
+
+
+RATE_LIMITS = [
+    # Public access REST API Pool (applies to all Public REST API endpoints)
+    RateLimit(limit_id=HTTP_PUBLIC_ENDPOINTS_LIMIT_ID, limit=5, time_interval=1),
+
+    # User access REST API Pool (applies to all REST API endpoints that require authentication)
+    RateLimit(limit_id=HTTP_USER_ENDPOINTS_LIMIT_ID, limit=10, time_interval=1),
+]
+
+
 _throttler = None
 
 
-def get_throttler() -> Throttler:  # todo alf: check limits for v3
+def get_throttler() -> AsyncThrottler:
     global _throttler
     if _throttler is None:
-        _throttler = Throttler(rate_limit=(5, 1.0))  # rate_limit=(weight, t_period)
+        _throttler = AsyncThrottler(RATE_LIMITS)
     return _throttler
