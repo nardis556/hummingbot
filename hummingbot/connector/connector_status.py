@@ -40,7 +40,9 @@ connector_status = {
     'terra': 'green',
     'uniswap': 'yellow',
     'uniswap_v3': 'yellow',
-    'wazirx': 'yellow'
+    'wazirx': 'yellow',
+    'idex': 'green',
+    'idex_sandbox_matic': 'green'
 }
 
 warning_messages = {
