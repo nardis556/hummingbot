@@ -10,9 +10,13 @@ Hummingbot instance with the IDEX connector.
 This is a temporarily arrangement, while we wait for [our Pull Request](https://github.com/CoinAlpha/hummingbot/pull/3199) 
 to the offical Hummingbot repo to be merged.
 
-At the moment the only supported method to get the Idex connector running is install from source. 
-Install scripts are located in directory `hummingbot/installation/install-from-source`
-Use the appropriate script for your OS.
+At the moment **the only supported method to get the Idex connector running is install from source**. 
+
+Download and run the appropriate installation script for your OS. Install scripts are located inside the 
+directory [`hummingbot/installation/install-from-source` (direct link)](https://github.com/idexio/hummingbot/tree/master/installation/install-from-source).
+
+After the installation script finishes, a folder named **hummingbot** will exist inside your current working directory.
+Start Hummingbot by executing: `conda activate hummingbot && python hummingbot/bin/hummingbot.py`
 
 If using a virtual machine to run Linux, please ensure you allocate enough RAM (AWS t2.small or equalivalent) to ensure the Hummingbot instance can run effectively. 
 The hummingbot installation will fail silently if not enough RAM is allocated. 

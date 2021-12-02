@@ -10,8 +10,8 @@ rm -rf $(pwd)/miniconda3/envs/hummingbot
 # UPDATE HUMMINGBOT
 # 1) Download latest code
 # git pull origin master
-# Install code from Idex repo temporarily, while we wait for our PR#3199 to be merged into CoinAlpha's repo
-git pull origin idex/developmentAkTech-coinalpha-rebase
+# Install code from Idex repo temporarily, while we wait for our PR to be accepted in CoinAlpha's repo
+git pull origin idex/devAktech-v3-silverton
 # 5) Install Hummingbot
 ./install
 # 6) Activate environment and compile code
