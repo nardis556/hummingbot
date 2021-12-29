@@ -32,7 +32,8 @@ from hummingbot.connector.exchange.idex.idex_utils import (
     get_gas_limit,
 )
 from hummingbot.connector.exchange.idex.idex_resolve import (
-    get_idex_rest_url, get_idex_blockchain, set_domain, get_throttler, HTTP_USER_ENDPOINTS_LIMIT_ID
+    get_idex_rest_url, get_idex_blockchain, set_domain, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID,
+    HTTP_USER_ENDPOINTS_LIMIT_ID
 )
 from hummingbot.core.utils import async_ttl_cache
 from hummingbot.logger import HummingbotLogger
@@ -609,7 +610,7 @@ class IdexExchange(ExchangeBase):
 
     async def get_market_info_from_api(self) -> List[Dict]:
         """Requests all markets (trading pairs) available to Idex users."""
-        async with get_throttler().execute_task(HTTP_USER_ENDPOINTS_LIMIT_ID):
+        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/markets"
             session: aiohttp.ClientSession = await self._http_client()
