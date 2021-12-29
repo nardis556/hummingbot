@@ -23,8 +23,8 @@ ia_logger = None
 
 
 class HashVersionEnum(Enum):  # Blockchain
-    MATIC_PROD = 3
-    MATIC_SANDBOX = 103
+    MATIC_PROD = 4
+    MATIC_SANDBOX = 104
 
 
 class OrderTypeEnum(Enum):
