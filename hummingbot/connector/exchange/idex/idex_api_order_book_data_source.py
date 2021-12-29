@@ -47,13 +47,14 @@ NaN = float("nan")
 
 
 _ts_sleep_start = defaultdict(time.time)
+_ts_sleep_window = 10
 
 
 def sleep_random_start(func):
-    """decorator for async function to add a small random sleep on first call"""
+    """decorate an async function to add a small random delay on first few calls. Silence annoying throttler log msg"""
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
-        if time.time() - _ts_sleep_start[func.__name__] < 1:
+        if time.time() - _ts_sleep_start[func.__name__] < _ts_sleep_window:
             time.sleep(random.random())
         return await func(*args, **kwargs)
     return wrapper
