@@ -1,4 +1,8 @@
 import asyncio
+import functools
+import random
+from collections import defaultdict
+
 import aiohttp
 import logging
 
@@ -42,6 +46,19 @@ MAX_RETRIES = 20
 NaN = float("nan")
 
 
+_ts_sleep_start = defaultdict(time.time)
+
+
+def sleep_random_start(func):
+    """decorator for async function to add a small random sleep on first call"""
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        if time.time() - _ts_sleep_start[func.__name__] < 1:
+            time.sleep(random.random())
+        return func(*args, **kwargs)
+    return wrapper
+
+
 class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
     MESSAGE_TIMEOUT = 30.0
     PING_TIMEOUT = 10.0
@@ -70,8 +87,9 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
         results = await safe_gather(*tasks)
         return {t_pair: result for t_pair, result in zip(trading_pairs, results)}
 
-    @classmethod
-    async def get_last_traded_price(cls, trading_pair: str, base_url: str = "https://api-matic.idex.io") -> float:
+    @staticmethod
+    @sleep_random_start
+    async def get_last_traded_price(trading_pair: str, base_url: str = "https://api-matic.idex.io") -> float:
         async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             async with aiohttp.ClientSession() as client:
                 url = f"{base_url}/v1/trades/?market={trading_pair}"
@@ -103,6 +121,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
             return result
 
     @staticmethod
+    @sleep_random_start
     async def fetch_trading_pairs(domain: Optional[str] = None) -> List[str]:
         async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             try:
@@ -125,6 +144,7 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
             return []
 
     @staticmethod
+    @sleep_random_start
     async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str, domain: Optional[str]) -> Dict[str, Any]:
         """
         Fetches order book snapshot for a particular trading pair from the rest API
