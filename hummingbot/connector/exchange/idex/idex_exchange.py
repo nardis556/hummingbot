@@ -32,8 +32,7 @@ from hummingbot.connector.exchange.idex.idex_utils import (
     get_gas_limit,
 )
 from hummingbot.connector.exchange.idex.idex_resolve import (
-    get_idex_rest_url, get_idex_blockchain, set_domain, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID,
-    HTTP_USER_ENDPOINTS_LIMIT_ID
+    get_idex_rest_url, get_idex_blockchain, set_domain, get_throttler, HTTP_USER_ENDPOINTS_LIMIT_ID
 )
 from hummingbot.core.utils import async_ttl_cache
 from hummingbot.logger import HummingbotLogger
@@ -439,11 +438,16 @@ class IdexExchange(ExchangeBase):
 
     async def get_ping(self):
         """Requests status of current connection."""
-        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
+        async with get_throttler().execute_task(HTTP_USER_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/ping/"
+            params = {
+                "nonce": self._idex_auth.generate_nonce(),
+                "wallet": self._idex_auth.get_wallet_address()
+            }
+            auth_dict = self._idex_auth.generate_auth_dict(http_method="GET", url=url, params=params)
             session: aiohttp.ClientSession = await self._http_client()
-            async with session.get(url) as response:
+            async with session.get(auth_dict["url"], headers=auth_dict["headers"]) as response:
                 if response.status != 200:
                     raise IOError(f"Error fetching data from {url}. HTTP status is {response.status}. {response}")
             return
@@ -589,18 +593,23 @@ class IdexExchange(ExchangeBase):
 
     async def get_exchange_info_from_api(self) -> Dict[str, Any]:
         """Requests basic info about idex exchange. We are mostly interested in the gas price in gwei"""
-        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
+        async with get_throttler().execute_task(HTTP_USER_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/exchange"
+            params = {
+                "nonce": self._idex_auth.generate_nonce(),
+                "wallet": self._idex_auth.get_wallet_address()
+            }
+            auth_dict = self._idex_auth.generate_auth_dict(http_method="GET", url=url, params=params)
             session: aiohttp.ClientSession = await self._http_client()
-            async with session.get(url) as response:
+            async with session.get(auth_dict["url"], headers=auth_dict["headers"]) as response:
                 if response.status != 200:
                     raise IOError(f"Error fetching data from {url}. HTTP status is {response.status}")
                 return await response.json()
 
     async def get_market_info_from_api(self) -> List[Dict]:
         """Requests all markets (trading pairs) available to Idex users."""
-        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
+        async with get_throttler().execute_task(HTTP_USER_ENDPOINTS_LIMIT_ID):
             rest_url = get_idex_rest_url(domain=self._domain)
             url = f"{rest_url}/v1/markets"
             session: aiohttp.ClientSession = await self._http_client()
