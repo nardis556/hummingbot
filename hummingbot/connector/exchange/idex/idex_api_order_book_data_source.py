@@ -55,7 +55,7 @@ def sleep_random_start(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         if time.time() - _ts_sleep_start[func.__name__] < _ts_sleep_window:
-            time.sleep(random.random())
+            time.sleep(1 + 0.5 * random.random())
         return await func(*args, **kwargs)
     return wrapper
 
