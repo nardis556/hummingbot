@@ -33,7 +33,7 @@ from hummingbot.connector.exchange.idex.idex_utils import (
 )
 from hummingbot.connector.exchange.idex.idex_resolve import (
     get_idex_rest_url, get_idex_blockchain, set_domain, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID,
-    HTTP_USER_ENDPOINTS_LIMIT_ID
+    HTTP_USER_ENDPOINTS_LIMIT_ID, reset_random_start, sleep_random_start
 )
 from hummingbot.core.utils import async_ttl_cache
 from hummingbot.logger import HummingbotLogger
@@ -197,6 +197,7 @@ class IdexExchange(ExchangeBase):
         This function is called automatically by the clock.
         """
         super().stop(clock)
+        reset_random_start()
 
     def get_order_price_quantum(self, trading_pair: str, price: Decimal) -> Decimal:
         """Provides the Idex standard minimum price increment across all trading pairs"""
@@ -608,6 +609,7 @@ class IdexExchange(ExchangeBase):
                     raise IOError(f"Error fetching data from {url}. HTTP status is {response.status}")
                 return await response.json()
 
+    @sleep_random_start
     async def get_market_info_from_api(self) -> List[Dict]:
         """Requests all markets (trading pairs) available to Idex users."""
         async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):

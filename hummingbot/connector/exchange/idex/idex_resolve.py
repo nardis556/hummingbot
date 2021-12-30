@@ -1,3 +1,10 @@
+import asyncio
+import functools
+import inspect
+import random
+import time
+from collections import defaultdict
+
 from hummingbot.core.api_throttler.async_throttler import AsyncThrottler
 
 # IDEX v3 REST API url for production and sandbox (users may need to modify this someday)
@@ -97,3 +104,28 @@ def get_throttler() -> AsyncThrottler:
     if _throttler is None:
         _throttler = AsyncThrottler(RATE_LIMITS)
     return _throttler
+
+
+_ts_sleep_start = defaultdict(time.time)
+_ts_sleep_window = 5
+
+
+def _is_method(func):
+    arg_names, *_ = inspect.getfullargspec(func)
+    return arg_names and (arg_names[0] == 'self' or arg_names[0] == 'cls')
+
+
+def sleep_random_start(func):
+    """decorate an async function to add a small random delay on first few calls. Silence annoying throttler log msg"""
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        if time.time() - _ts_sleep_start[func.__name__] < _ts_sleep_window:
+            await asyncio.sleep(1 + 0.5 * random.random())
+        if _is_method(func):
+            args = args[1:]
+        return await func(*args, **kwargs)
+    return wrapper
+
+
+def reset_random_start():
+    _ts_sleep_start.clear()

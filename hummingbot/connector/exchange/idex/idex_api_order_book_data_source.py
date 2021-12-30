@@ -1,7 +1,4 @@
 import asyncio
-import functools
-import random
-from collections import defaultdict
 
 import aiohttp
 import logging
@@ -36,7 +33,7 @@ from hummingbot.connector.exchange.idex.idex_active_order_tracker import IdexAct
 from hummingbot.connector.exchange.idex.idex_order_book_tracker_entry import IdexOrderBookTrackerEntry
 from hummingbot.connector.exchange.idex.idex_order_book import IdexOrderBook
 from hummingbot.connector.exchange.idex.idex_resolve import (
-    get_idex_rest_url, get_idex_ws_feed, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID
+    get_idex_rest_url, get_idex_ws_feed, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID, sleep_random_start
 )
 from hummingbot.connector.exchange.idex.idex_utils import (
     DEBUG, DISABLE_LISTEN_FOR_ORDERBOOK_DIFFS, ORDER_BOOK_SNAPSHOT_REFRESH_TIME
@@ -44,20 +41,6 @@ from hummingbot.connector.exchange.idex.idex_utils import (
 
 MAX_RETRIES = 20
 NaN = float("nan")
-
-
-_ts_sleep_start = defaultdict(time.time)
-_ts_sleep_window = 10
-
-
-def sleep_random_start(func):
-    """decorate an async function to add a small random delay on first few calls. Silence annoying throttler log msg"""
-    @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
-        if time.time() - _ts_sleep_start[func.__name__] < _ts_sleep_window:
-            time.sleep(1 + 0.5 * random.random())
-        return await func(*args, **kwargs)
-    return wrapper
 
 
 class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
