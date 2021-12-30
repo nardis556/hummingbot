@@ -46,8 +46,6 @@ NORMALIZED_PRECISION = 1e-08  # see Numbers & Precision at: https://docs.idex.io
 
 class IdexExchange(ExchangeBase):
 
-    name: str = EXCHANGE_NAME
-
     SHORT_POLL_INTERVAL = 11.0
     LONG_POLL_INTERVAL = 120.0
     UPDATE_ORDER_STATUS_MIN_INTERVAL = 45.0
