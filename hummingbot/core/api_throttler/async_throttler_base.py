@@ -38,13 +38,17 @@ class AsyncThrottlerBase(ABC):
                  rate_limits: List[RateLimit],
                  retry_interval: float = 0.1,
                  safety_margin_pct: Optional[float] = 0.05,  # An extra safety margin, in percentage.
+                 silence_warnings: bool = False,  # whether to silence log warnings when limits almost reached
                  ):
         """
         :param rate_limits: List of RateLimit(s).
         :param retry_interval: Time between every capacity check.
         :param safety_margin: Percentage of limit to be added as a safety margin when calculating capacity to ensure calls are within the limit.
+        :param silence_warnings:  set to True to silence log warnings when limits are almost reached
         """
         from hummingbot.client.config.global_config_map import global_config_map  # avoids chance of circular import
+
+        self._silence_warnings = silence_warnings
 
         # Rate Limit Definitions
         self._rate_limits: List[RateLimit] = copy.deepcopy(rate_limits)

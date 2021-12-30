@@ -1,6 +1,5 @@
 import asyncio
 import functools
-import inspect
 import random
 import time
 from collections import defaultdict
@@ -102,17 +101,12 @@ _throttler = None
 def get_throttler() -> AsyncThrottler:
     global _throttler
     if _throttler is None:
-        _throttler = AsyncThrottler(RATE_LIMITS)
+        _throttler = AsyncThrottler(rate_limits=RATE_LIMITS, silence_warnings=True)
     return _throttler
 
 
 _ts_sleep_start = defaultdict(time.time)
-_ts_sleep_window = 5
-
-
-def _is_method(func):
-    arg_names, *_ = inspect.getfullargspec(func)
-    return arg_names and (arg_names[0] == 'self' or arg_names[0] == 'cls')
+_ts_sleep_window = 10
 
 
 def sleep_random_start(func):
@@ -121,8 +115,6 @@ def sleep_random_start(func):
     async def wrapper(*args, **kwargs):
         if time.time() - _ts_sleep_start[func.__name__] < _ts_sleep_window:
             await asyncio.sleep(1 + 0.5 * random.random())
-        if _is_method(func):
-            args = args[1:]
         return await func(*args, **kwargs)
     return wrapper
 

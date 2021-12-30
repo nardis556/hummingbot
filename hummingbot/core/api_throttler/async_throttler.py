@@ -33,7 +33,8 @@ class AsyncRequestContext(AsyncRequestContextBase):
                               f"{rate_limit.time_interval}s) has almost reached. Limits used " \
                               f"is {capacity_used} in the last " \
                               f"{rate_limit.time_interval} seconds"
-                        self.logger().notify(msg)
+                        if not self._silence_warnings:
+                            self.logger().notify(msg)
                         AsyncRequestContextBase._last_max_cap_warning_ts = now
                     return False
         return True
@@ -66,4 +67,5 @@ class AsyncThrottler(AsyncThrottlerBase):
             lock=self._lock,
             safety_margin_pct=self._safety_margin_pct,
             retry_interval=self._retry_interval,
+            silence_warnings=self._silence_warnings,
         )

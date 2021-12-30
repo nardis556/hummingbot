@@ -33,7 +33,7 @@ from hummingbot.connector.exchange.idex.idex_active_order_tracker import IdexAct
 from hummingbot.connector.exchange.idex.idex_order_book_tracker_entry import IdexOrderBookTrackerEntry
 from hummingbot.connector.exchange.idex.idex_order_book import IdexOrderBook
 from hummingbot.connector.exchange.idex.idex_resolve import (
-    get_idex_rest_url, get_idex_ws_feed, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID, sleep_random_start
+    get_idex_rest_url, get_idex_ws_feed, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID,
 )
 from hummingbot.connector.exchange.idex.idex_utils import (
     DEBUG, DISABLE_LISTEN_FOR_ORDERBOOK_DIFFS, ORDER_BOOK_SNAPSHOT_REFRESH_TIME
@@ -72,7 +72,6 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
         return {t_pair: result for t_pair, result in zip(trading_pairs, results)}
 
     @staticmethod
-    @sleep_random_start
     async def get_last_traded_price(trading_pair: str, base_url: str = "https://api-matic.idex.io") -> float:
         async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             async with aiohttp.ClientSession() as client:
@@ -105,7 +104,6 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
             return result
 
     @staticmethod
-    @sleep_random_start
     async def fetch_trading_pairs(domain: Optional[str] = None) -> List[str]:
         async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
             try:
@@ -128,7 +126,6 @@ class IdexAPIOrderBookDataSource(OrderBookTrackerDataSource):
             return []
 
     @staticmethod
-    @sleep_random_start
     async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str, domain: Optional[str]) -> Dict[str, Any]:
         """
         Fetches order book snapshot for a particular trading pair from the rest API

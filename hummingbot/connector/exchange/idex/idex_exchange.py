@@ -92,7 +92,8 @@ class IdexExchange(ExchangeBase):
         self._trading_rules_polling_task = None
         self._last_poll_timestamp = 0
         self._exchange_info = None  # stores info about the exchange. Periodically polled from GET /v1/exchange
-        self._market_info = None    # stores info about the markets. Periodically polled from GET /v1/markets
+        self._market_info = None  # stores info about the markets. Periodically polled from GET /v1/markets
+        self._assets_info = None  # stores ifo about assets. Periodically polled from GET /v1/assets
         self._order_lock = asyncio.Lock()  # exclusive access for modifying orders
 
     @property
@@ -260,12 +261,16 @@ class IdexExchange(ExchangeBase):
                 await asyncio.sleep(0.5)
 
     async def _update_trading_rules(self):
+        # load all data we depend on if missing. later _status_polling_loop() will periodically refresh them
         exchange_info = self._exchange_info if self._exchange_info else await self.get_exchange_info_from_api()
         market_info = self._market_info if self._market_info else await self.get_market_info_from_api()
-        self._trading_rules.clear()
-        self._trading_rules = self._format_trading_rules(exchange_info, market_info)
+        assets_info = self._assets_info if self._assets_info else await self.get_assets_from_api()
+        # recompute trading rules
+        self._trading_rules = self._format_trading_rules(exchange_info, market_info, assets_info)
 
-    def _format_trading_rules(self, exchange_info: Dict[str, Any], market_info: List[Dict]) -> Dict[str, TradingRule]:
+    def _format_trading_rules(
+            self, exchange_info: Dict[str, Any], market_info: List[Dict], assets_info: List[Dict]
+    ) -> Dict[str, TradingRule]:
         """
         Converts json API response into a dictionary of trading rules.
         :param exchange_info: The json API responsen for exchange rules
@@ -315,14 +320,39 @@ class IdexExchange(ExchangeBase):
             },
             ...
         ]
+
+        Assets Response Example:
+        [
+            {
+                "name": "Ether",
+                "symbol": "ETH",
+                "contractAddress": "0x0000000000000000000000000000000000000000",
+                "assetDecimals": 18,
+                "exchangeDecimals": 8,
+                "maticPrice": "152.67175572"
+            },
+            {
+                "name": "USD Coin",
+                "symbol": "USDC",
+                "contractAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "assetDecimals": 6,
+                "exchangeDecimals": 8,
+                "maticPrice": "0.76335877"
+            },
+            ...
+        ]
         """
         rules = {}
         price_step = Decimal(str(NORMALIZED_PRECISION))
         quantity_step = Decimal(str(NORMALIZED_PRECISION))
-        minimum_order_size = Decimal(str(exchange_info["makerTradeMinimum"]))
+        minimum_order_size_matic = Decimal(str(exchange_info["makerTradeMinimum"]))
+        asset_by_symbol = {asset['symbol']: asset for asset in assets_info}
         for t_pair in market_info:
             trading_pair = t_pair["market"]
             try:
+                base_symbol = trading_pair.split('-')[0]
+                base_matic_price = asset_by_symbol[base_symbol]['maticPrice']
+                minimum_order_size = Decimal(minimum_order_size_matic) / Decimal(base_matic_price)
                 rules[trading_pair] = TradingRule(trading_pair=trading_pair,
                                                   min_order_size=minimum_order_size,
                                                   min_price_increment=price_step,
@@ -617,6 +647,17 @@ class IdexExchange(ExchangeBase):
                     raise IOError(f"Error fetching data from {url}. HTTP status is {response.status}")
                 return await response.json()
 
+    async def get_assets_from_api(self) -> List[Dict]:
+        """Requests info about assets traded in Idex"""
+        async with get_throttler().execute_task(HTTP_PUBLIC_ENDPOINTS_LIMIT_ID):
+            rest_url = get_idex_rest_url(domain=self._domain)
+            url = f"{rest_url}/v1/assets"
+            session: aiohttp.ClientSession = await self._http_client()
+            async with session.get(url) as response:
+                if response.status != 200:
+                    raise IOError(f"Error fetching data from {url}. HTTP status is {response.status}")
+                return await response.json()
+
     async def _create_order(self,
                             trade_type: TradeType,
                             client_order_id: str,
@@ -750,7 +791,8 @@ class IdexExchange(ExchangeBase):
                     self._update_balances(),
                     self._update_order_status(),
                     self._update_exchange_info(),
-                    self._update_market_info()
+                    self._update_market_info(),
+                    self._update_assets_info(),
                 )
             except asyncio.CancelledError:
                 raise
@@ -1006,6 +1048,11 @@ class IdexExchange(ExchangeBase):
     async def _update_market_info(self):
         """Call REST API to update basic market info"""
         self._market_info = await self.get_market_info_from_api()
+
+    @async_ttl_cache(ttl=60 * 7, maxsize=1)
+    async def _update_assets_info(self):
+        """Call REST API to update basic market info"""
+        self._assets_info = await self.get_assets_from_api()
 
     async def _iter_user_event_queue(self) -> AsyncIterable[Dict[str, any]]:
         while True:

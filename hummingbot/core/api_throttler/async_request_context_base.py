@@ -40,6 +40,7 @@ class AsyncRequestContextBase(ABC):
                  lock: asyncio.Lock,
                  safety_margin_pct: float,
                  retry_interval: float = 0.1,
+                 silence_warnings: bool = False,  # whether to silence log warnings when limits almost reached
                  ):
         """
         Asynchronous context associated with each API request.
@@ -48,6 +49,7 @@ class AsyncRequestContextBase(ABC):
         :param rate_limits: List of linked rate limits with its corresponding weight associated with this API Request
         :param lock: A shared asyncio.Lock used between all instances of APIRequestContextBase
         :param retry_interval: Time between each limit check
+        :param silence_warnings:  set to True to silence log warnings when limits are almost reached
         """
         self._task_logs: List[TaskLog] = task_logs
         self._rate_limit: RateLimit = rate_limit
@@ -55,6 +57,7 @@ class AsyncRequestContextBase(ABC):
         self._lock: asyncio.Lock = lock
         self._safety_margin_pct: float = safety_margin_pct
         self._retry_interval: float = retry_interval
+        self._silence_warnings: bool = silence_warnings
 
     def flush(self):
         """
