@@ -4,7 +4,6 @@ import time
 import asyncio
 import aiohttp
 
-
 from decimal import Decimal
 from typing import Optional, List, Dict, Any, AsyncIterable
 from async_timeout import timeout
@@ -29,10 +28,10 @@ from hummingbot.connector.exchange.idex.idex_order_book_tracker import IdexOrder
 from hummingbot.connector.exchange.idex.idex_user_stream_tracker import IdexUserStreamTracker
 from hummingbot.connector.exchange.idex.idex_utils import (
     hb_order_type_to_idex_param, hb_trade_type_to_idex_param, EXCHANGE_NAME, get_new_client_order_id, DEBUG,
-    get_gas_limit,
+    GAS_EXTRA_FEES,
 )
 from hummingbot.connector.exchange.idex.idex_resolve import (
-    get_idex_rest_url, get_idex_blockchain, set_domain, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID,
+    get_idex_rest_url, set_domain, get_throttler, HTTP_PUBLIC_ENDPOINTS_LIMIT_ID,
     HTTP_USER_ENDPOINTS_LIMIT_ID
 )
 from hummingbot.core.utils import async_ttl_cache
@@ -822,18 +821,11 @@ class IdexExchange(ExchangeBase):
         """
         is_maker = order_type is OrderType.LIMIT_MAKER
         percent_fees: Decimal = estimate_fee(EXCHANGE_NAME, is_maker).percent
-        if is_maker:
-            return TradeFee(percent=percent_fees)
         # for taker idex v3 collects additional gas fee, collected in the asset received by the taker
-        flat_fees = []
-        blockchain = get_idex_blockchain(domain=self._domain)
-        gas_limit = get_gas_limit(blockchain)
-        if self._exchange_info and 'gasPrice' in self._exchange_info:
-            # resolve gas price from idex exchange endpoint
-            gas_price: Decimal = Decimal(self._exchange_info['gasPrice']) / Decimal("1e9")
-            gas_amount: Decimal = gas_price * Decimal(gas_limit)
-            flat_fees = [(blockchain, gas_amount)]
-        return TradeFee(percent=percent_fees, flat_fees=flat_fees)
+        # we grossly approximate this as an extra percentage fee
+        gas_extra_fees = GAS_EXTRA_FEES[0] if is_maker else GAS_EXTRA_FEES[1]
+        percent_fees += Decimal(str(gas_extra_fees)) / Decimal("100")
+        return TradeFee(percent=percent_fees)
 
     async def _update_order_status(self):
         """
